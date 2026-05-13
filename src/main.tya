@@ -1,0 +1,3 @@
+import flakewatch
+
+Cli.main(args())

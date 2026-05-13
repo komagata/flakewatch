@@ -1,0 +1,38 @@
+class Server
+  static serve = opts ->
+    println("listening on " + opts["host"] + ":" + opts["port"].to_s())
+    server = socket_server_listen(opts["host"], opts["port"], {})
+    while true
+      client = socket_server_accept(server)
+      Server.handle(client)
+
+  static handle = client ->
+    request = socket_read(client, 4096)
+    first = ""
+    lines = request.split("\n")
+    if lines.len() > 0
+      first = lines[0]
+    path = "/"
+    parts = first.split(" ")
+    if parts.len() > 1
+      path = parts[1]
+    body = ""
+    if path.starts_with("/tests/")
+      body = Server.history_body(path.replace("/tests/", ""))
+    else
+      body = Server.index_body(path)
+    response = "HTTP/1.1 200 OK\nContent-Type: text/html; charset=utf-8\nConnection: close\nContent-Length: " + body.byte_len().to_s() + "\n\n" + body
+    socket_write(client, response)
+    socket_close(client)
+
+  static index_body = request_path ->
+    db = Database.open("flakewatch.sqlite3")
+    body = "<html><body><pre>" + request_path + "\n" + Report.render(db, "markdown") + "</pre></body></html>"
+    db.close()
+    return body
+
+  static history_body = name ->
+    db = Database.open("flakewatch.sqlite3")
+    body = "<html><body><pre>" + Report.history(db, name) + "</pre></body></html>"
+    db.close()
+    return body

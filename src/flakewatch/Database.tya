@@ -1,0 +1,48 @@
+import sqlite
+
+class Database
+  static open = path ->
+    db = Connection.open(path)
+    Database.migrate(db)
+    return db
+
+  static migrate = db ->
+    db.exec("create table if not exists runs (id integer primary key, repo text, workflow text, run_id text, run_attempt text, sha text, branch text, event text, started_at text, unique(repo, run_id, run_attempt));")
+    db.exec("create table if not exists jobs (id integer primary key, run_id integer, name text, os text, runtime text, unique(run_id, name));")
+    db.exec("create table if not exists junit_files (id integer primary key, job_id integer, path text, digest text, warnings text, unique(job_id, path));")
+    db.exec("create table if not exists test_cases (id integer primary key, suite text, classname text, name text, file text, unique(suite, classname, name, file));")
+    db.exec("create table if not exists test_results (id integer primary key, run_id integer, job_id integer, junit_file_id integer, test_case_id integer, status text, duration real, message text, body text, system_out text, system_err text, unique(run_id, job_id, junit_file_id, test_case_id));")
+    db.exec("create table if not exists flake_scores (test_case_id integer primary key, score real, observations integer, pass_count integer, fail_count integer, error_count integer, skipped_count integer, transition_count integer, last_status text);")
+
+  static ensure_run = db, opts ->
+    rows = db.query("select id from runs where repo = ? and run_id = ? and run_attempt = ?", [opts["repo"], opts["run_id"], opts["run_attempt"]])
+    if rows.len() > 0
+      return rows[0]["id"]
+    db.exec("insert into runs (repo, workflow, run_id, run_attempt, sha, branch, event, started_at) values (?, ?, ?, ?, ?, ?, ?, ?)", [opts["repo"], opts["workflow"], opts["run_id"], opts["run_attempt"], opts["sha"], opts["branch"], opts["event"], opts["started_at"]])
+    return db.query("select last_insert_rowid() as id")[0]["id"]
+
+  static ensure_job = db, run_id, opts ->
+    rows = db.query("select id from jobs where run_id = ? and name = ?", [run_id, opts["job"]])
+    if rows.len() > 0
+      return rows[0]["id"]
+    db.exec("insert into jobs (run_id, name, os, runtime) values (?, ?, ?, ?)", [run_id, opts["job"], opts["os"], opts["runtime"]])
+    return db.query("select last_insert_rowid() as id")[0]["id"]
+
+  static ensure_file = db, job_id, path, digest, warnings ->
+    rows = db.query("select id from junit_files where job_id = ? and path = ?", [job_id, path])
+    if rows.len() > 0
+      db.exec("update junit_files set digest = ?, warnings = ? where id = ?", [digest, warnings, rows[0]["id"]])
+      return rows[0]["id"]
+    db.exec("insert into junit_files (job_id, path, digest, warnings) values (?, ?, ?, ?)", [job_id, path, digest, warnings])
+    return db.query("select last_insert_rowid() as id")[0]["id"]
+
+  static ensure_case = db, item ->
+    rows = db.query("select id from test_cases where suite = ? and classname = ? and name = ? and file = ?", [item["suite"], item["classname"], item["name"], item["file"]])
+    if rows.len() > 0
+      return rows[0]["id"]
+    db.exec("insert into test_cases (suite, classname, name, file) values (?, ?, ?, ?)", [item["suite"], item["classname"], item["name"], item["file"]])
+    return db.query("select last_insert_rowid() as id")[0]["id"]
+
+  static upsert_result = db, run_id, job_id, file_id, case_id, item ->
+    db.exec("delete from test_results where run_id = ? and job_id = ? and junit_file_id = ? and test_case_id = ?", [run_id, job_id, file_id, case_id])
+    db.exec("insert into test_results (run_id, job_id, junit_file_id, test_case_id, status, duration, message, body, system_out, system_err) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [run_id, job_id, file_id, case_id, item["status"], item["duration"], item["message"], item["body"], item["system_out"], item["system_err"]])

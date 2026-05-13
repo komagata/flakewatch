@@ -1,0 +1,5 @@
+name = "flakewatch"
+version = "0.1.0"
+
+[dependencies]
+sqlite = { path = "../tya-sqlite" }

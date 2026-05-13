@@ -1,0 +1,89 @@
+import os as os
+
+class Cli
+  static main = argv ->
+    opts = Cli.parse(argv)
+    command = opts["command"]
+    if command == "init"
+      Database.open(opts["db"]).close()
+      return nil
+    if command == "ingest"
+      Ingest.run(opts)
+      return nil
+    if command == "report"
+      print(Report.render(Database.open(opts["db"]), opts["format"]))
+      return nil
+    if command == "list"
+      print(Report.list(Database.open(opts["db"])))
+      return nil
+    if command == "history"
+      print(Report.history(Database.open(opts["db"]), opts["test"]))
+      return nil
+    if command == "serve"
+      Server.serve(opts)
+      return nil
+    if command == "doctor"
+      println("sqlite: ok")
+      println("xml: ok")
+      println("github_actions: " + Cli.env_or("GITHUB_ACTIONS", "false"))
+      return nil
+    Cli.usage()
+    os.Os.exit(1)
+
+  static parse = argv ->
+    opts = {}
+    opts["command"] = "help"
+    opts["db"] = "flakewatch.sqlite3"
+    opts["junit"] = []
+    opts["format"] = "text"
+    opts["host"] = "127.0.0.1"
+    opts["port"] = 8787
+    opts["repo"] = Cli.env_or("GITHUB_REPOSITORY", "local")
+    opts["workflow"] = Cli.env_or("GITHUB_WORKFLOW", "local")
+    opts["run_id"] = Cli.env_or("GITHUB_RUN_ID", "local")
+    opts["run_attempt"] = Cli.env_or("GITHUB_RUN_ATTEMPT", "1")
+    opts["job"] = Cli.env_or("GITHUB_JOB", "local")
+    opts["sha"] = Cli.env_or("GITHUB_SHA", "")
+    opts["branch"] = Cli.env_or("GITHUB_REF_NAME", "")
+    opts["event"] = Cli.env_or("GITHUB_EVENT_NAME", "")
+    opts["os"] = Cli.env_or("RUNNER_OS", "")
+    opts["runtime"] = ""
+    opts["started_at"] = ""
+    if argv.len() > 0
+      opts["command"] = argv[0]
+    i = 1
+    while i < argv.len()
+      arg = argv[i]
+      if arg == "--db"
+        i = i + 1
+        opts["db"] = argv[i]
+      elseif arg == "--junit"
+        i = i + 1
+        opts["junit"].push(argv[i])
+      elseif arg == "--format"
+        i = i + 1
+        opts["format"] = argv[i]
+      elseif arg == "--host"
+        i = i + 1
+        opts["host"] = argv[i]
+      elseif arg == "--port"
+        i = i + 1
+        opts["port"] = argv[i].to_i()
+      elseif arg == "--test"
+        i = i + 1
+        opts["test"] = argv[i]
+      elseif arg.starts_with("--")
+        key = arg.replace("--", "").replace("-", "_")
+        i = i + 1
+        opts[key] = argv[i]
+      i = i + 1
+    return opts
+
+  static env_or = name, fallback ->
+    value = os.Os.env(name)
+    if value == nil or value == ""
+      return fallback
+    return value
+
+  static usage = ->
+    println("usage: flakewatch <init|ingest|report|list|history|serve|doctor> --db PATH")

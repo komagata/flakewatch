@@ -1,0 +1,37 @@
+class Report
+  static render = db, format ->
+    rows = Report.rows(db)
+    if format == "markdown" or format == "github-summary"
+      return Report.markdown(rows)
+    return Report.text(rows)
+
+  static rows = db ->
+    return db.query("select test_cases.suite as suite, test_cases.classname as classname, test_cases.name as name, flake_scores.score as score, flake_scores.observations as observations, flake_scores.pass_count as pass_count, flake_scores.fail_count as fail_count, flake_scores.error_count as error_count, flake_scores.transition_count as transitions, flake_scores.last_status as last_status from flake_scores join test_cases on test_cases.id = flake_scores.test_case_id order by flake_scores.score desc, test_cases.classname, test_cases.name")
+
+  static text = rows ->
+    out = "Flaky suspects\n"
+    for row in rows
+      if row["score"] > 0
+        out = out + row["classname"] + "." + row["name"] + " score=" + row["score"].to_s() + " observations=" + row["observations"].to_s() + " last=" + row["last_status"] + "\n"
+    return out
+
+  static markdown = rows ->
+    out = "## Flakewatch Summary\n\n| Test | Score | Obs | Pass | Fail | Error | Transitions | Last |\n|---|---:|---:|---:|---:|---:|---:|---|\n"
+    for row in rows
+      if row["score"] > 0
+        out = out + "| `" + row["classname"] + "." + row["name"] + "` | " + row["score"].to_s() + " | " + row["observations"].to_s() + " | " + row["pass_count"].to_s() + " | " + row["fail_count"].to_s() + " | " + row["error_count"].to_s() + " | " + row["transitions"].to_s() + " | " + row["last_status"] + " |\n"
+    return out
+
+  static list = db ->
+    rows = db.query("select classname, name from test_cases order by classname, name")
+    out = ""
+    for row in rows
+      out = out + row["classname"] + "." + row["name"] + "\n"
+    return out
+
+  static history = db, test_name ->
+    rows = db.query("select test_cases.classname as classname, test_cases.name as name, test_results.status as status from test_results join test_cases on test_cases.id = test_results.test_case_id where test_cases.name = ? or test_cases.classname || '.' || test_cases.name = ? order by test_results.run_id, test_results.id", [test_name, test_name])
+    out = ""
+    for row in rows
+      out = out + row["classname"] + "." + row["name"] + " " + row["status"] + "\n"
+    return out

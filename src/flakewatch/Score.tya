@@ -1,0 +1,41 @@
+class Score
+  static refresh = db ->
+    db.exec("delete from flake_scores")
+    cases = db.query("select id from test_cases order by id")
+    for item in cases
+      Score.refresh_one(db, item["id"])
+
+  static refresh_one = db, case_id ->
+    rows = db.query("select status from test_results where test_case_id = ? order by run_id, id", [case_id])
+    observations = rows.len()
+    pass_count = 0
+    fail_count = 0
+    error_count = 0
+    skipped_count = 0
+    transitions = 0
+    last_status = ""
+    prev = ""
+    for row in rows
+      status = row["status"]
+      if status == "passed"
+        pass_count = pass_count + 1
+      elseif status == "failed"
+        fail_count = fail_count + 1
+      elseif status == "error"
+        error_count = error_count + 1
+      elseif status == "skipped"
+        skipped_count = skipped_count + 1
+      if prev != "" and Score.passish(prev) != Score.passish(status)
+        transitions = transitions + 1
+      prev = status
+      last_status = status
+    non_pass = fail_count + error_count
+    score = 0
+    if pass_count > 0 and non_pass > 0
+      score = 50 + transitions * 10 + non_pass * 5
+    elseif non_pass > 0
+      score = non_pass
+    db.exec("insert into flake_scores (test_case_id, score, observations, pass_count, fail_count, error_count, skipped_count, transition_count, last_status) values (?, ?, ?, ?, ?, ?, ?, ?, ?)", [case_id, score, observations, pass_count, fail_count, error_count, skipped_count, transitions, last_status])
+
+  static passish = status ->
+    return status == "passed" or status == "skipped"

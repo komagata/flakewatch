@@ -1,0 +1,13 @@
+<testsuites>
+  <testsuite name="pkg">
+    <testcase classname="pkg.FlakyTest" name="alternates" time="0.03">
+      <failure message="sometimes">failure body</failure>
+    </testcase>
+    <testcase classname="pkg.AlwaysFailTest" name="fails" time="0.04">
+      <failure message="still failing">failure body</failure>
+    </testcase>
+    <testcase classname="pkg.ErrorTest" name="errors" time="0.01">
+      <error message="boom">error body</error>
+    </testcase>
+  </testsuite>
+</testsuites>

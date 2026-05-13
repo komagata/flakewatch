@@ -1,0 +1,11 @@
+<testsuite name="pkg" tests="3" failures="1" errors="0" skipped="1">
+  <testcase classname="pkg.FlakyTest" name="alternates" time="0.01"/>
+  <testcase classname="pkg.AlwaysFailTest" name="fails" time="0.02">
+    <failure message="expected true"><![CDATA[stack trace]]></failure>
+    <system-out>stdout text</system-out>
+    <system-err>stderr text</system-err>
+  </testcase>
+  <testcase classname="pkg.SkipTest" name="skips" file="skip_test.tya" line="12">
+    <skipped message="disabled"/>
+  </testcase>
+</testsuite>

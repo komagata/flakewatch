@@ -1,0 +1,92 @@
+import file as file
+import path as path
+import dir as dir
+import xml as xml
+
+class JUnit
+  static files = patterns ->
+    out = []
+    for pattern in patterns
+      if pattern.contains("**/*.xml")
+        base = pattern.split("**/*.xml")[0]
+        if base.ends_with("/")
+          base = JUnit.slice(base, 0, base.byte_len() - 1)
+        JUnit.collect_xml(base, out)
+      else
+        out.push(pattern)
+    return out
+
+  static collect_xml = root, out ->
+    if root == ""
+      root = "."
+    for name in dir.Dir.list(root)
+      full = path.Path.join([root, name])
+      if name.ends_with(".xml")
+        out.push(full)
+      elseif not name.contains(".")
+        JUnit.collect_xml(full, out)
+
+  static slice = text, start, finish ->
+    out = ""
+    i = start
+    while i < finish
+      out = out + text[i]
+      i = i + 1
+    return out
+
+  static parse_file = path_name ->
+    return JUnit.parse(file.File.read(path_name))
+
+  static parse = text ->
+    root = xml.Xml.parse(text).root()
+    suites = []
+    if root.name == "testsuite"
+      suites.push(root)
+    else
+      suites = root.find_all_recursive("testsuite")
+    cases = []
+    for suite_node in suites
+      for item in suite_node.find_all("testcase")
+        cases.push(JUnit.case_from(suite_node, item))
+    return cases
+
+  static case_from = suite, item ->
+    failure = item.find("failure")
+    error = item.find("error")
+    skipped = item.find("skipped")
+    status = "passed"
+    message = ""
+    body = ""
+    if failure != nil
+      status = "failed"
+      message = failure.attr("message", "")
+      body = failure.text()
+    if error != nil
+      status = "error"
+      message = error.attr("message", message)
+      body = error.text()
+    if skipped != nil and status == "passed"
+      status = "skipped"
+      message = skipped.attr("message", "")
+      body = skipped.text()
+    stdout = ""
+    stderr = ""
+    out = item.find("system-out")
+    err = item.find("system-err")
+    if out != nil
+      stdout = out.text()
+    if err != nil
+      stderr = err.text()
+    out = {}
+    out["suite"] = suite.attr("name", "")
+    out["classname"] = item.attr("classname", "")
+    out["name"] = item.attr("name", "")
+    out["file"] = item.attr("file", "")
+    out["line"] = item.attr("line", "")
+    out["duration"] = item.attr("time", "0").to_f()
+    out["status"] = status
+    out["message"] = message
+    out["body"] = body
+    out["system_out"] = stdout
+    out["system_err"] = stderr
+    return out

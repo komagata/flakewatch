@@ -1,0 +1,23 @@
+import digest as digest
+import file as file
+
+class Ingest
+  static run = opts ->
+    db = Database.open(opts["db"])
+    run_id = Database.ensure_run(db, opts)
+    job_id = Database.ensure_job(db, run_id, opts)
+    count = 0
+    for path_name in JUnit.files(opts["junit"])
+      text = file.File.read(path_name)
+      cases = JUnit.parse(text)
+      warning = ""
+      if cases.len() == 0
+        warning = "zero test cases"
+      file_id = Database.ensure_file(db, job_id, path_name, digest.Digest.sha256(text), warning)
+      for item in cases
+        case_id = Database.ensure_case(db, item)
+        Database.upsert_result(db, run_id, job_id, file_id, case_id, item)
+        count = count + 1
+    Score.refresh(db)
+    println("ingested " + count.to_s() + " test results")
+    db.close()
