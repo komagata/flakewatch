@@ -29,6 +29,13 @@ The report contains:
 Add one report step after your test command, then upload the HTML artifact:
 
 ```yaml
+- name: Install flakewatch
+  run: |
+    curl -fsSL -o /tmp/flakewatch.tar.gz \
+      https://github.com/komagata/flakewatch/releases/download/v0.2.0/flakewatch-v0.2.0-linux-amd64.tar.gz
+    tar -xzf /tmp/flakewatch.tar.gz -C /tmp
+    sudo install /tmp/flakewatch /usr/local/bin/flakewatch
+
 - name: Generate flakewatch report
   if: always()
   run: |
