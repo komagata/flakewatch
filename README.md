@@ -11,7 +11,8 @@ workflow artifacts.
 flakewatch html \
   --junit "test-results/**/*.xml" \
   --output flakewatch.html \
-  --source-base-url "https://github.com/OWNER/REPO/blob/COMMIT_SHA"
+  --source-base-url "https://github.com/OWNER/REPO/blob/COMMIT_SHA" \
+  --source-root "."
 ```
 
 The report contains:
@@ -19,6 +20,8 @@ The report contains:
 - flaky tests: tests that appear with both passing and failing/error outcomes
   across the provided JUnit files
 - slow tests: tests ranked by their maximum and average recorded duration
+- source links: file links from JUnit XML, with inferred Ruby test line links
+  when the XML omits line numbers
 - run summary: total tests, observations, and failures/errors
 
 ## GitHub Actions
@@ -32,7 +35,8 @@ Add one report step after your test command, then upload the HTML artifact:
     flakewatch html \
       --junit "test-results/**/*.xml" \
       --output flakewatch.html \
-      --source-base-url "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
+      --source-base-url "https://github.com/${{ github.repository }}/blob/${{ github.sha }}" \
+      --source-root "."
 
 - name: Upload flakewatch report
   if: always()

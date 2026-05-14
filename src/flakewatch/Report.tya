@@ -2,7 +2,7 @@ import file as file
 
 class Report
   static render_html_file = opts ->
-    html = Self.html_from_junit_with_source(opts["junit"], opts["source_base_url"])
+    html = Self.html_from_junit_with_source_root(opts["junit"], opts["source_base_url"], opts["source_root"])
     file.File.write(opts["output"], html)
     println("wrote " + opts["output"])
 
@@ -10,11 +10,15 @@ class Report
     return Self.html_from_junit_with_source(patterns, "")
 
   static html_from_junit_with_source = patterns, source_base_url ->
-    rows = Self.junit_rows(patterns)
+    return Self.html_from_junit_with_source_root(patterns, source_base_url, ".")
+
+  static html_from_junit_with_source_root = patterns, source_base_url, source_root ->
+    rows = Self.junit_rows(patterns, source_root)
     return Self.html(rows, source_base_url)
 
-  static junit_rows = patterns ->
+  static junit_rows = patterns, source_root ->
     by_test = {}
+    source_cache = {}
     for path_name in JUnit.files(patterns)
       for item in JUnit.parse_file(path_name)
         class_name = item["classname"]
@@ -24,9 +28,10 @@ class Report
         if by_test[key] == nil
           row = {}
           row["name"] = key
+          row["test_name"] = item["name"]
           row["suite"] = item["suite"]
           row["file"] = item["file"]
-          row["line"] = item["line"]
+          row["line"] = Self.source_line(source_root, source_cache, item["file"], item["line"], item["name"])
           row["observations"] = 0
           row["pass_count"] = 0
           row["fail_count"] = 0
@@ -39,6 +44,10 @@ class Report
           row["previous_passish"] = ""
           by_test[key] = row
         row = by_test[key]
+        if row["file"] == "" and item["file"] != ""
+          row["file"] = item["file"]
+        if row["line"] == "" and item["file"] != ""
+          row["line"] = Self.source_line(source_root, source_cache, item["file"], item["line"], item["name"])
         status = item["status"]
         passish = "false"
         if status == "passed" or status == "skipped"
@@ -179,6 +188,43 @@ class Report
     if row["line"] != ""
       href = href + "#L" + row["line"]
     return "<a href=\"" + Self.escape(href) + "\">" + label + "</a>"
+
+  static source_line = source_root, source_cache, relative_path, line, test_name ->
+    if line != ""
+      return line
+    if relative_path == ""
+      return ""
+    source_path = relative_path
+    if source_root != "" and source_root != "."
+      source_path = source_root + "/" + relative_path
+    if source_cache[source_path] == nil
+      if file.File.exists?(source_path)
+        source_cache[source_path] = file.File.read(source_path).split("\n")
+      else
+        source_cache[source_path] = []
+    lines = source_cache[source_path]
+    if lines.len() == 0
+      return ""
+    candidates = Self.test_line_candidates(test_name)
+    i = 0
+    while i < lines.len()
+      for candidate in candidates
+        if candidate != "" and lines[i].contains(candidate)
+          return (i + 1).to_s()
+      i = i + 1
+    return ""
+
+  static test_line_candidates = test_name ->
+    candidates = []
+    candidates.push("def " + test_name)
+    if test_name.starts_with("test_")
+      name = JUnit.slice(test_name, 5, test_name.byte_len())
+      candidates.push("test \"" + name + "\"")
+      candidates.push("test '" + name + "'")
+      words = name.replace("_", " ")
+      candidates.push("test \"" + words + "\"")
+      candidates.push("test '" + words + "'")
+    return candidates
 
   static render = db, format ->
     rows = Self.rows(db)

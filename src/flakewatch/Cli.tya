@@ -41,6 +41,7 @@ class Cli
     opts["format"] = "text"
     opts["output"] = "flakewatch.html"
     opts["source_base_url"] = ""
+    opts["source_root"] = "."
     opts["host"] = "127.0.0.1"
     opts["port"] = 8787
     opts["repo"] = Self.env_or("GITHUB_REPOSITORY", "local")
@@ -74,6 +75,9 @@ class Cli
       elseif arg == "--source-base-url"
         i = i + 1
         opts["source_base_url"] = argv[i]
+      elseif arg == "--source-root"
+        i = i + 1
+        opts["source_root"] = argv[i]
       elseif arg == "--host"
         i = i + 1
         opts["host"] = argv[i]

@@ -27,7 +27,8 @@ jobs:
           flakewatch html \
             --junit "test-results/**/*.xml" \
             --output flakewatch.html \
-            --source-base-url "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
+            --source-base-url "https://github.com/${{ github.repository }}/blob/${{ github.sha }}" \
+            --source-root "."
 
       - name: Upload flakewatch report
         if: always()

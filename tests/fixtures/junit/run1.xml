@@ -8,4 +8,5 @@
   <testcase classname="pkg.SkipTest" name="skips" file="skip_test.tya" line="12">
     <skipped message="disabled"/>
   </testcase>
+  <testcase classname="User::EventsTest" name="test_does_not_show_events_the_user_is_not_participating_in" time="0.03" file="tests/fixtures/source/user_events_test.rb"/>
 </testsuite>
