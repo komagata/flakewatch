@@ -1,5 +1,5 @@
 <testsuite name="pkg" tests="3" failures="1" errors="0" skipped="1">
-  <testcase classname="pkg.FlakyTest" name="alternates" time="0.01"/>
+  <testcase classname="pkg.FlakyTest" name="alternates" time="0.01" file="flaky_test.tya" line="8"/>
   <testcase classname="pkg.AlwaysFailTest" name="fails" time="0.02">
     <failure message="expected true"><![CDATA[stack trace]]></failure>
     <system-out>stdout text</system-out>
@@ -8,4 +8,5 @@
   <testcase classname="pkg.SkipTest" name="skips" file="skip_test.tya" line="12">
     <skipped message="disabled"/>
   </testcase>
+  <testcase classname="User::EventsTest" name="test_does_not_show_events_the_user_is_not_participating_in" time="0.03" file="tests/fixtures/source/user_events_test.rb"/>
 </testsuite>

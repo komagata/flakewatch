@@ -1,7 +1,6 @@
 import file as file
 import path as path
 import dir as dir
-import xml as xml
 
 class JUnit
   static files = patterns ->
@@ -38,55 +37,85 @@ class JUnit
     return JUnit.parse(file.File.read(path_name))
 
   static parse = text ->
-    root = xml.Xml.parse(text).root()
-    suites = []
-    if root.name == "testsuite"
-      suites.push(root)
-    else
-      suites = root.find_all_recursive("testsuite")
     cases = []
-    for suite_node in suites
-      for item in suite_node.find_all("testcase")
-        cases.push(JUnit.case_from(suite_node, item))
+    suite_chunks = text.split("<testsuite ")
+    if suite_chunks.len() == 1
+      JUnit.parse_cases(text, "", cases)
+    else
+      i = 1
+      while i < suite_chunks.len()
+        chunk = suite_chunks[i]
+        suite_name = JUnit.attr(chunk, "name", "")
+        JUnit.parse_cases(chunk, suite_name, cases)
+        i = i + 1
     return cases
 
-  static case_from = suite, item ->
-    failure = item.find("failure")
-    error = item.find("error")
-    skipped = item.find("skipped")
+  static parse_cases = text, suite_name, cases ->
+    chunks = text.split("<testcase ")
+    i = 1
+    while i < chunks.len()
+      cases.push(JUnit.case_from(suite_name, chunks[i]))
+      i = i + 1
+
+  static case_from = suite_name, item ->
     status = "passed"
     message = ""
     body = ""
-    if failure != nil
+    if item.contains("<failure")
       status = "failed"
-      message = failure.attr("message", "")
-      body = failure.text()
-    if error != nil
+      failure = item.split("<failure")[1]
+      message = JUnit.attr(failure, "message", "")
+      body = JUnit.element_body(failure, "failure")
+    if item.contains("<error")
       status = "error"
-      message = error.attr("message", message)
-      body = error.text()
-    if skipped != nil and status == "passed"
+      error = item.split("<error")[1]
+      message = JUnit.attr(error, "message", message)
+      body = JUnit.element_body(error, "error")
+    if item.contains("<skipped") and status == "passed"
       status = "skipped"
-      message = skipped.attr("message", "")
-      body = skipped.text()
+      skipped = item.split("<skipped")[1]
+      message = JUnit.attr(skipped, "message", "")
+      body = JUnit.element_body(skipped, "skipped")
     stdout = ""
     stderr = ""
-    out = item.find("system-out")
-    err = item.find("system-err")
-    if out != nil
-      stdout = out.text()
-    if err != nil
-      stderr = err.text()
+    if item.contains("<system-out")
+      stdout = JUnit.element_body(item.split("<system-out")[1], "system-out")
+    if item.contains("<system-err")
+      stderr = JUnit.element_body(item.split("<system-err")[1], "system-err")
     out = {}
-    out["suite"] = suite.attr("name", "")
-    out["classname"] = item.attr("classname", "")
-    out["name"] = item.attr("name", "")
-    out["file"] = item.attr("file", "")
-    out["line"] = item.attr("line", "")
-    out["duration"] = item.attr("time", "0").to_f()
+    out["suite"] = suite_name
+    out["classname"] = JUnit.attr(item, "classname", "")
+    out["name"] = JUnit.attr(item, "name", "")
+    out["file"] = JUnit.attr(item, "file", "")
+    out["line"] = JUnit.attr(item, "line", "")
+    out["duration"] = JUnit.attr(item, "time", "0").to_f()
     out["status"] = status
     out["message"] = message
     out["body"] = body
     out["system_out"] = stdout
     out["system_err"] = stderr
     return out
+
+  static attr = text, name, fallback ->
+    marker = name + "=\""
+    parts = []
+    if text.starts_with(marker)
+      parts = text.split(marker)
+    else
+      parts = text.split(" " + marker)
+      if parts.len() < 2
+        parts = text.split("\n" + marker)
+      if parts.len() < 2
+        parts = text.split("\t" + marker)
+    if parts.len() < 2
+      return fallback
+    return parts[1].split("\"")[0]
+
+  static element_body = text, name ->
+    parts = text.split(">")
+    if parts.len() < 2
+      return ""
+    body = parts[1].split("</" + name)[0]
+    body = body.replace("<![CDATA[", "")
+    body = body.replace("]]", "")
+    return body

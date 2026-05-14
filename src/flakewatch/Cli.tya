@@ -2,13 +2,16 @@ import os as os
 
 class Cli
   static main = argv ->
-    opts = Cli.parse(argv)
+    opts = Self.parse(argv)
     command = opts["command"]
     if command == "init"
       Database.open(opts["db"]).close()
       return nil
     if command == "ingest"
       Ingest.run(opts)
+      return nil
+    if command == "html"
+      Report.render_html_file(opts)
       return nil
     if command == "report"
       print(Report.render(Database.open(opts["db"]), opts["format"]))
@@ -25,9 +28,9 @@ class Cli
     if command == "doctor"
       println("sqlite: ok")
       println("xml: ok")
-      println("github_actions: " + Cli.env_or("GITHUB_ACTIONS", "false"))
+      println("github_actions: " + Self.env_or("GITHUB_ACTIONS", "false"))
       return nil
-    Cli.usage()
+    Self.usage()
     os.Os.exit(1)
 
   static parse = argv ->
@@ -36,17 +39,20 @@ class Cli
     opts["db"] = "flakewatch.sqlite3"
     opts["junit"] = []
     opts["format"] = "text"
+    opts["output"] = "flakewatch.html"
+    opts["source_base_url"] = ""
+    opts["source_root"] = "."
     opts["host"] = "127.0.0.1"
     opts["port"] = 8787
-    opts["repo"] = Cli.env_or("GITHUB_REPOSITORY", "local")
-    opts["workflow"] = Cli.env_or("GITHUB_WORKFLOW", "local")
-    opts["run_id"] = Cli.env_or("GITHUB_RUN_ID", "local")
-    opts["run_attempt"] = Cli.env_or("GITHUB_RUN_ATTEMPT", "1")
-    opts["job"] = Cli.env_or("GITHUB_JOB", "local")
-    opts["sha"] = Cli.env_or("GITHUB_SHA", "")
-    opts["branch"] = Cli.env_or("GITHUB_REF_NAME", "")
-    opts["event"] = Cli.env_or("GITHUB_EVENT_NAME", "")
-    opts["os"] = Cli.env_or("RUNNER_OS", "")
+    opts["repo"] = Self.env_or("GITHUB_REPOSITORY", "local")
+    opts["workflow"] = Self.env_or("GITHUB_WORKFLOW", "local")
+    opts["run_id"] = Self.env_or("GITHUB_RUN_ID", "local")
+    opts["run_attempt"] = Self.env_or("GITHUB_RUN_ATTEMPT", "1")
+    opts["job"] = Self.env_or("GITHUB_JOB", "local")
+    opts["sha"] = Self.env_or("GITHUB_SHA", "")
+    opts["branch"] = Self.env_or("GITHUB_REF_NAME", "")
+    opts["event"] = Self.env_or("GITHUB_EVENT_NAME", "")
+    opts["os"] = Self.env_or("RUNNER_OS", "")
     opts["runtime"] = ""
     opts["started_at"] = ""
     if argv.len() > 0
@@ -63,6 +69,15 @@ class Cli
       elseif arg == "--format"
         i = i + 1
         opts["format"] = argv[i]
+      elseif arg == "--output"
+        i = i + 1
+        opts["output"] = argv[i]
+      elseif arg == "--source-base-url"
+        i = i + 1
+        opts["source_base_url"] = argv[i]
+      elseif arg == "--source-root"
+        i = i + 1
+        opts["source_root"] = argv[i]
       elseif arg == "--host"
         i = i + 1
         opts["host"] = argv[i]
@@ -85,5 +100,10 @@ class Cli
       return fallback
     return value
 
-  static usage = ->
-    println("usage: flakewatch <init|ingest|report|list|history|serve|doctor> --db PATH")
+  static usage = () ->
+    println(
+      "usage: flakewatch html --junit 'test-results/**/*.xml' --output flakewatch.html",
+    )
+    println(
+      "       flakewatch <init|ingest|report|list|history|serve|doctor> --db PATH",
+    )
