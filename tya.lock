@@ -4,7 +4,8 @@ version = 1
 [[package]]
 name = "sqlite"
 version = "0.1.0"
-source = "path"
-path = "../tya-sqlite"
-checksum = ""
+source = "git"
+git = "https://github.com/komagata/tya-sqlite"
+rev = "ff642aac3ca5bc156084094a34d4fcdcbe28b488"
+checksum = "sha256:bbe9b1c18d5968d28f90890cb944e3cabe266d7cd53f2414ae7e378131a1a29c"
 dependencies = []
