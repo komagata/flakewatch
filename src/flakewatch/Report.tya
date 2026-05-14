@@ -13,12 +13,11 @@ class Report
     return Self.html_from_junit_with_source_root(patterns, source_base_url, ".")
 
   static html_from_junit_with_source_root = patterns, source_base_url, source_root ->
-    rows = Self.junit_rows(patterns, source_root)
-    return Self.html(rows, source_base_url)
+    rows = Self.junit_rows(patterns)
+    return Self.html(rows, source_base_url, source_root)
 
-  static junit_rows = patterns, source_root ->
+  static junit_rows = patterns ->
     by_test = {}
-    source_cache = {}
     for path_name in JUnit.files(patterns)
       for item in JUnit.parse_file(path_name)
         class_name = item["classname"]
@@ -31,7 +30,7 @@ class Report
           row["test_name"] = item["name"]
           row["suite"] = item["suite"]
           row["file"] = item["file"]
-          row["line"] = Self.source_line(source_root, source_cache, item["file"], item["line"], item["name"])
+          row["line"] = item["line"]
           row["observations"] = 0
           row["pass_count"] = 0
           row["fail_count"] = 0
@@ -47,7 +46,7 @@ class Report
         if row["file"] == "" and item["file"] != ""
           row["file"] = item["file"]
         if row["line"] == "" and item["file"] != ""
-          row["line"] = Self.source_line(source_root, source_cache, item["file"], item["line"], item["name"])
+          row["line"] = item["line"]
         status = item["status"]
         passish = "false"
         if status == "passed" or status == "skipped"
@@ -80,9 +79,11 @@ class Report
       rows.push(row)
     return rows
 
-  static html = rows, source_base_url ->
+  static html = rows, source_base_url, source_root ->
     flaky = Self.top_rows(rows, "flake_score", 20)
     slow = Self.top_rows(rows, "max_duration", 20)
+    source_cache = {}
+    source_line_cache = {}
     total = 0
     observations = 0
     failures = 0
@@ -103,12 +104,12 @@ class Report
       + "</strong>observations</div><div class=\"metric\"><strong>"
       + failures.to_s()
       + "</strong>failures/errors</div></div>"
-    out = out + "<h2>Flaky Tests</h2>" + Self.flaky_table(flaky, source_base_url)
-    out = out + "<h2>Slow Tests</h2>" + Self.slow_table(slow, source_base_url)
+    out = out + "<h2>Flaky Tests</h2>" + Self.flaky_table(flaky, source_base_url, source_root, source_cache, source_line_cache)
+    out = out + "<h2>Slow Tests</h2>" + Self.slow_table(slow, source_base_url, source_root, source_cache, source_line_cache)
     out = out + "</body></html>"
     return out
 
-  static flaky_table = rows, source_base_url ->
+  static flaky_table = rows, source_base_url, source_root, source_cache, source_line_cache ->
     out = "<table><thead><tr><th>Test</th><th class=\"num\">Score</th><th class=\"num\">Obs</th><th class=\"num\">Pass</th><th class=\"num\">Fail</th><th class=\"num\">Error</th><th class=\"num\">Transitions</th><th>Last</th></tr></thead><tbody>"
     count = 0
     for row in rows
@@ -116,7 +117,7 @@ class Report
         count = count + 1
         out = out
           + "<tr><td>"
-          + Self.test_link(row, source_base_url)
+          + Self.test_link(row, source_base_url, source_root, source_cache, source_line_cache)
           + "</td><td class=\"num\">"
           + row["flake_score"].to_s()
           + "</td><td class=\"num\">"
@@ -136,7 +137,7 @@ class Report
       return "<div class=\"empty\">No flaky tests detected in these JUnit files.</div>"
     return out + "</tbody></table>"
 
-  static slow_table = rows, source_base_url ->
+  static slow_table = rows, source_base_url, source_root, source_cache, source_line_cache ->
     out = "<table><thead><tr><th>Test</th><th class=\"num\">Max seconds</th><th class=\"num\">Avg seconds</th><th class=\"num\">Obs</th><th>Last</th></tr></thead><tbody>"
     count = 0
     for row in rows
@@ -144,7 +145,7 @@ class Report
         count = count + 1
         out = out
           + "<tr><td>"
-          + Self.test_link(row, source_base_url)
+          + Self.test_link(row, source_base_url, source_root, source_cache, source_line_cache)
           + "</td><td class=\"num\">"
           + row["max_duration"].to_s()
           + "</td><td class=\"num\">"
@@ -180,16 +181,17 @@ class Report
   static escape = text ->
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
-  static test_link = row, source_base_url ->
+  static test_link = row, source_base_url, source_root, source_cache, source_line_cache ->
     label = Self.escape(row["name"])
     if source_base_url == "" or row["file"] == ""
       return label
     href = source_base_url + "/" + row["file"]
-    if row["line"] != ""
-      href = href + "#L" + row["line"]
+    line = Self.source_line(source_root, source_cache, source_line_cache, row["file"], row["line"], row["test_name"])
+    if line != ""
+      href = href + "#L" + line
     return "<a href=\"" + Self.escape(href) + "\">" + label + "</a>"
 
-  static source_line = source_root, source_cache, relative_path, line, test_name ->
+  static source_line = source_root, source_cache, source_line_cache, relative_path, line, test_name ->
     if line != ""
       return line
     if relative_path == ""
@@ -197,6 +199,9 @@ class Report
     source_path = relative_path
     if source_root != "" and source_root != "."
       source_path = source_root + "/" + relative_path
+    cache_key = source_path + "\n" + test_name
+    if source_line_cache[cache_key] != nil
+      return source_line_cache[cache_key]
     if source_cache[source_path] == nil
       if file.File.exists?(source_path)
         source_cache[source_path] = file.File.read(source_path).split("\n")
@@ -204,14 +209,18 @@ class Report
         source_cache[source_path] = []
     lines = source_cache[source_path]
     if lines.len() == 0
+      source_line_cache[cache_key] = ""
       return ""
     candidates = Self.test_line_candidates(test_name)
     i = 0
     while i < lines.len()
       for candidate in candidates
         if candidate != "" and lines[i].contains(candidate)
-          return (i + 1).to_s()
+          found = (i + 1).to_s()
+          source_line_cache[cache_key] = found
+          return found
       i = i + 1
+    source_line_cache[cache_key] = ""
     return ""
 
   static test_line_candidates = test_name ->
