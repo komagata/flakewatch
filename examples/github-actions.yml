@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Run your normal test command here. Configure it to write JUnit XML.
+      # Replace this example with your project's actual test command.
+      - name: Run tests
+        run: |
+          bundle exec rspec \
+            --format progress \
+            --format RspecJunitFormatter \
+            --out test-results/rspec.xml
+
+      - name: Generate flakewatch report
+        if: always()
+        run: |
+          flakewatch html \
+            --junit "test-results/**/*.xml" \
+            --output flakewatch.html \
+            --source-base-url "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
+
+      - name: Upload flakewatch report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flakewatch-report
+          path: flakewatch.html
+
+      - name: Add report link to job summary
+        if: always()
+        run: |
+          {
+            echo "## Flakewatch"
+            echo ""
+            echo "Open the \`flakewatch-report\` artifact from this workflow run to view flaky and slow test analysis."
+          } >> "$GITHUB_STEP_SUMMARY"

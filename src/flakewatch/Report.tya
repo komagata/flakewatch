@@ -1,9 +1,190 @@
+import file as file
+
 class Report
+  static render_html_file = opts ->
+    html = Self.html_from_junit_with_source(opts["junit"], opts["source_base_url"])
+    file.File.write(opts["output"], html)
+    println("wrote " + opts["output"])
+
+  static html_from_junit = patterns ->
+    return Self.html_from_junit_with_source(patterns, "")
+
+  static html_from_junit_with_source = patterns, source_base_url ->
+    rows = Self.junit_rows(patterns)
+    return Self.html(rows, source_base_url)
+
+  static junit_rows = patterns ->
+    by_test = {}
+    for path_name in JUnit.files(patterns)
+      for item in JUnit.parse_file(path_name)
+        class_name = item["classname"]
+        if class_name == ""
+          class_name = item["suite"]
+        key = class_name + "." + item["name"]
+        if by_test[key] == nil
+          row = {}
+          row["name"] = key
+          row["suite"] = item["suite"]
+          row["file"] = item["file"]
+          row["line"] = item["line"]
+          row["observations"] = 0
+          row["pass_count"] = 0
+          row["fail_count"] = 0
+          row["error_count"] = 0
+          row["skipped_count"] = 0
+          row["transition_count"] = 0
+          row["total_duration"] = 0
+          row["max_duration"] = 0
+          row["last_status"] = ""
+          row["previous_passish"] = ""
+          by_test[key] = row
+        row = by_test[key]
+        status = item["status"]
+        passish = "false"
+        if status == "passed" or status == "skipped"
+          passish = "true"
+        if row["previous_passish"] != "" and row["previous_passish"] != passish
+          row["transition_count"] = row["transition_count"] + 1
+        row["previous_passish"] = passish
+        row["observations"] = row["observations"] + 1
+        if status == "passed"
+          row["pass_count"] = row["pass_count"] + 1
+        elseif status == "failed"
+          row["fail_count"] = row["fail_count"] + 1
+        else
+          if status == "error"
+            row["error_count"] = row["error_count"] + 1
+          elseif status == "skipped"
+            row["skipped_count"] = row["skipped_count"] + 1
+        row["total_duration"] = row["total_duration"] + item["duration"]
+        if item["duration"] > row["max_duration"]
+          row["max_duration"] = item["duration"]
+        row["last_status"] = status
+    rows = []
+    for key in by_test.keys()
+      row = by_test[key]
+      row["avg_duration"] = row["total_duration"] / row["observations"]
+      row["flake_score"] = 0
+      non_pass = row["fail_count"] + row["error_count"]
+      if row["pass_count"] > 0 and non_pass > 0
+        row["flake_score"] = 50 + row["transition_count"] * 10 + non_pass * 5
+      rows.push(row)
+    return rows
+
+  static html = rows, source_base_url ->
+    flaky = Self.top_rows(rows, "flake_score", 20)
+    slow = Self.top_rows(rows, "max_duration", 20)
+    total = 0
+    observations = 0
+    failures = 0
+    for row in rows
+      total = total + 1
+      observations = observations + row["observations"]
+      failures = failures + row["fail_count"] + row["error_count"]
+    out = "<!doctype html><html><head><meta charset=\"utf-8\"><title>Flakewatch Report</title><style>"
+    out = out
+      + "body{{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;margin:32px;color:#1f2937;background:#f8fafc}}h1{{margin:0 0 8px}}h2{{margin-top:28px}}.summary{{display:flex;gap:12px;flex-wrap:wrap}}.metric{{background:white;border:1px solid #e5e7eb;border-radius:8px;padding:14px 18px;min-width:130px}}.metric strong{{display:block;font-size:28px}}table{{width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}}th,td{{padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:left}}th{{background:#eef2f7;font-size:12px;text-transform:uppercase;color:#475569}}.num{{text-align:right}}.status{{font-weight:600}}.empty{{background:white;border:1px solid #e5e7eb;border-radius:8px;padding:18px;color:#64748b}}"
+    out = out
+      + "</style></head><body><h1>Flakewatch Report</h1><p>JUnit XML analysis for flaky and slow tests.</p>"
+    out = out
+      + "<div class=\"summary\"><div class=\"metric\"><strong>"
+      + total.to_s()
+      + "</strong>tests</div><div class=\"metric\"><strong>"
+      + observations.to_s()
+      + "</strong>observations</div><div class=\"metric\"><strong>"
+      + failures.to_s()
+      + "</strong>failures/errors</div></div>"
+    out = out + "<h2>Flaky Tests</h2>" + Self.flaky_table(flaky, source_base_url)
+    out = out + "<h2>Slow Tests</h2>" + Self.slow_table(slow, source_base_url)
+    out = out + "</body></html>"
+    return out
+
+  static flaky_table = rows, source_base_url ->
+    out = "<table><thead><tr><th>Test</th><th class=\"num\">Score</th><th class=\"num\">Obs</th><th class=\"num\">Pass</th><th class=\"num\">Fail</th><th class=\"num\">Error</th><th class=\"num\">Transitions</th><th>Last</th></tr></thead><tbody>"
+    count = 0
+    for row in rows
+      if row["flake_score"] > 0
+        count = count + 1
+        out = out
+          + "<tr><td>"
+          + Self.test_link(row, source_base_url)
+          + "</td><td class=\"num\">"
+          + row["flake_score"].to_s()
+          + "</td><td class=\"num\">"
+          + row["observations"].to_s()
+          + "</td><td class=\"num\">"
+          + row["pass_count"].to_s()
+          + "</td><td class=\"num\">"
+          + row["fail_count"].to_s()
+          + "</td><td class=\"num\">"
+          + row["error_count"].to_s()
+          + "</td><td class=\"num\">"
+          + row["transition_count"].to_s()
+          + "</td><td class=\"status\">"
+          + Self.escape(row["last_status"])
+          + "</td></tr>"
+    if count == 0
+      return "<div class=\"empty\">No flaky tests detected in these JUnit files.</div>"
+    return out + "</tbody></table>"
+
+  static slow_table = rows, source_base_url ->
+    out = "<table><thead><tr><th>Test</th><th class=\"num\">Max seconds</th><th class=\"num\">Avg seconds</th><th class=\"num\">Obs</th><th>Last</th></tr></thead><tbody>"
+    count = 0
+    for row in rows
+      if row["max_duration"] > 0
+        count = count + 1
+        out = out
+          + "<tr><td>"
+          + Self.test_link(row, source_base_url)
+          + "</td><td class=\"num\">"
+          + row["max_duration"].to_s()
+          + "</td><td class=\"num\">"
+          + row["avg_duration"].to_s()
+          + "</td><td class=\"num\">"
+          + row["observations"].to_s()
+          + "</td><td class=\"status\">"
+          + Self.escape(row["last_status"])
+          + "</td></tr>"
+    if count == 0
+      return "<div class=\"empty\">No timed tests found in these JUnit files.</div>"
+    return out + "</tbody></table>"
+
+  static top_rows = rows, field, limit ->
+    out = []
+    used = {}
+    while out.len() < limit and out.len() < rows.len()
+      best = nil
+      best_index = -1
+      i = 0
+      while i < rows.len()
+        if used[i.to_s()] == nil
+          if best == nil or rows[i][field] > best[field]
+            best = rows[i]
+            best_index = i
+        i = i + 1
+      if best == nil
+        return out
+      used[best_index.to_s()] = "true"
+      out.push(best)
+    return out
+
+  static escape = text ->
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+
+  static test_link = row, source_base_url ->
+    label = Self.escape(row["name"])
+    if source_base_url == "" or row["file"] == ""
+      return label
+    href = source_base_url + "/" + row["file"]
+    if row["line"] != ""
+      href = href + "#L" + row["line"]
+    return "<a href=\"" + Self.escape(href) + "\">" + label + "</a>"
+
   static render = db, format ->
-    rows = Report.rows(db)
+    rows = Self.rows(db)
     if format == "markdown" or format == "github-summary"
-      return Report.markdown(rows)
-    return Report.text(rows)
+      return Self.markdown(rows)
+    return Self.text(rows)
 
   static rows = db ->
     return db.query("select test_cases.suite as suite, test_cases.classname as classname, test_cases.name as name, flake_scores.score as score, flake_scores.observations as observations, flake_scores.pass_count as pass_count, flake_scores.fail_count as fail_count, flake_scores.error_count as error_count, flake_scores.transition_count as transitions, flake_scores.last_status as last_status from flake_scores join test_cases on test_cases.id = flake_scores.test_case_id order by flake_scores.score desc, test_cases.classname, test_cases.name")
@@ -12,26 +193,71 @@ class Report
     out = "Flaky suspects\n"
     for row in rows
       if row["score"] > 0
-        out = out + row["classname"] + "." + row["name"] + " score=" + row["score"].to_s() + " observations=" + row["observations"].to_s() + " last=" + row["last_status"] + "\n"
+        out = out
+          + row["classname"]
+          + "."
+          + row["name"]
+          + " score="
+          + row["score"].to_s()
+          + " observations="
+          + row["observations"].to_s()
+          + " last="
+          + row["last_status"]
+          + "\n"
     return out
 
   static markdown = rows ->
-    out = "## Flakewatch Summary\n\n| Test | Score | Obs | Pass | Fail | Error | Transitions | Last |\n|---|---:|---:|---:|---:|---:|---:|---|\n"
+    out = """
+      ## Flakewatch Summary
+
+      | Test | Score | Obs | Pass | Fail | Error | Transitions | Last |
+      |---|---:|---:|---:|---:|---:|---:|---|
+      """
     for row in rows
       if row["score"] > 0
-        out = out + "| `" + row["classname"] + "." + row["name"] + "` | " + row["score"].to_s() + " | " + row["observations"].to_s() + " | " + row["pass_count"].to_s() + " | " + row["fail_count"].to_s() + " | " + row["error_count"].to_s() + " | " + row["transitions"].to_s() + " | " + row["last_status"] + " |\n"
+        out = out
+          + "| `"
+          + row["classname"]
+          + "."
+          + row["name"]
+          + "` | "
+          + row["score"].to_s()
+          + " | "
+          + row["observations"].to_s()
+          + " | "
+          + row["pass_count"].to_s()
+          + " | "
+          + row["fail_count"].to_s()
+          + " | "
+          + row["error_count"].to_s()
+          + " | "
+          + row["transitions"].to_s()
+          + " | "
+          + row["last_status"]
+          + " |\n"
     return out
 
   static list = db ->
-    rows = db.query("select classname, name from test_cases order by classname, name")
+    rows = db.query(
+      "select classname, name from test_cases order by classname, name",
+    )
     out = ""
     for row in rows
       out = out + row["classname"] + "." + row["name"] + "\n"
     return out
 
   static history = db, test_name ->
-    rows = db.query("select test_cases.classname as classname, test_cases.name as name, test_results.status as status from test_results join test_cases on test_cases.id = test_results.test_case_id where test_cases.name = ? or test_cases.classname || '.' || test_cases.name = ? order by test_results.run_id, test_results.id", [test_name, test_name])
+    rows = db.query(
+      "select test_cases.classname as classname, test_cases.name as name, test_results.status as status from test_results join test_cases on test_cases.id = test_results.test_case_id where test_cases.name = ? or test_cases.classname || '.' || test_cases.name = ? order by test_results.run_id, test_results.id",
+      [test_name, test_name],
+    )
     out = ""
     for row in rows
-      out = out + row["classname"] + "." + row["name"] + " " + row["status"] + "\n"
+      out = out
+        + row["classname"]
+        + "."
+        + row["name"]
+        + " "
+        + row["status"]
+        + "\n"
     return out
