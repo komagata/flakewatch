@@ -35,6 +35,9 @@ class FlakewatchTest extends TestCase
     html = Report.html_from_junit(["tests/fixtures/junit/**/*.xml"])
     self.assert(html.contains("<h2>Flaky Tests</h2>"), "flaky section")
     self.assert(html.contains("<h2>Slow Tests</h2>"), "slow section")
+    self.assert(html.contains("data-sort=\"number\">Fail</th>"), "sortable fail count")
+    self.assert(html.contains("data-sort=\"number\">Max seconds</th>"), "sortable max seconds")
+    self.assert(html.contains("querySelectorAll('th[data-sort]')"), "sort script")
     self.assert(html.contains("pkg.FlakyTest.alternates"), "flaky test")
     self.assert(html.contains("pkg.AlwaysFailTest.fails"), "slow test")
 
