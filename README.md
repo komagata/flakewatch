@@ -96,17 +96,3 @@ flakewatch doctor
 `--source-base-url` enables GitHub links in the report. `--source-root` points
 to the checked-out source tree and is used to infer Ruby test method line links
 when JUnit XML only includes a file path.
-
-## Legacy SQLite Workflow
-
-The older SQLite workflow is still available for local history experiments, but
-it is not required for the recommended static HTML report:
-
-```sh
-flakewatch init --db .flakewatch/flakewatch.sqlite3
-flakewatch ingest --db .flakewatch/flakewatch.sqlite3 --junit "test-results/**/*.xml"
-flakewatch report --db .flakewatch/flakewatch.sqlite3 --format github-summary
-flakewatch list --db .flakewatch/flakewatch.sqlite3
-flakewatch history --db .flakewatch/flakewatch.sqlite3 --test pkg.Test.name
-flakewatch serve --db .flakewatch/flakewatch.sqlite3 --host 127.0.0.1 --port 8787
-```
