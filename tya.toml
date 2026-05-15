@@ -1,5 +1,5 @@
 name = "flakewatch"
-version = "0.2.0"
+version = "0.3.0"
 
 [dependencies]
 sqlite = { git = "https://github.com/komagata/tya-sqlite", tag = "v0.1.0" }

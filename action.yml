@@ -1,0 +1,52 @@
+name: Flakewatch
+description: Generate a static HTML report for flaky and slow tests from JUnit XML.
+
+inputs:
+  junit:
+    description: JUnit XML glob. Use **/*.xml for recursive matching.
+    required: false
+    default: test-results/**/*.xml
+  output:
+    description: HTML report output path.
+    required: false
+    default: flakewatch.html
+  source-base-url:
+    description: Base URL for source links.
+    required: false
+    default: ""
+  source-root:
+    description: Local source root used to infer Ruby test line links.
+    required: false
+    default: "."
+  version:
+    description: Flakewatch release version to install.
+    required: false
+    default: v0.3.0
+
+runs:
+  using: composite
+  steps:
+    - name: Install flakewatch
+      shell: bash
+      run: |
+        install_dir="${RUNNER_TEMP}/flakewatch"
+        mkdir -p "$install_dir"
+        FLAKEWATCH_VERSION="${{ inputs.version }}" \
+          FLAKEWATCH_INSTALL_DIR="$install_dir" \
+          sh "${{ github.action_path }}/install.sh"
+        echo "$install_dir" >> "$GITHUB_PATH"
+
+    - name: Generate flakewatch report
+      shell: bash
+      run: |
+        if [ -n "${{ inputs['source-base-url'] }}" ]; then
+          source_base_url="${{ inputs['source-base-url'] }}"
+        else
+          source_base_url="https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}"
+        fi
+
+        flakewatch html \
+          --junit "${{ inputs.junit }}" \
+          --output "${{ inputs.output }}" \
+          --source-base-url "$source_base_url" \
+          --source-root "${{ inputs['source-root'] }}"

@@ -12,10 +12,7 @@ The default HTML workflow does not need SQLite, a cache, or restored artifacts.
 Install the released Linux amd64 binary:
 
 ```sh
-curl -fsSL -o /tmp/flakewatch.tar.gz \
-  https://github.com/komagata/flakewatch/releases/download/v0.2.0/flakewatch-v0.2.0-linux-amd64.tar.gz
-tar -xzf /tmp/flakewatch.tar.gz -C /tmp
-sudo install /tmp/flakewatch /usr/local/bin/flakewatch
+curl -fsSL https://raw.githubusercontent.com/komagata/flakewatch/main/install.sh | sh
 ```
 
 Generate a report from JUnit XML:
@@ -42,7 +39,7 @@ The report contains:
 ## GitHub Actions
 
 Configure your test command to write JUnit XML, then generate and upload the
-HTML report:
+HTML report with the Flakewatch action:
 
 ```yaml
 - uses: actions/checkout@v4
@@ -54,21 +51,12 @@ HTML report:
       --format RspecJunitFormatter \
       --out test-results/rspec.xml
 
-- name: Install flakewatch
-  run: |
-    curl -fsSL -o /tmp/flakewatch.tar.gz \
-      https://github.com/komagata/flakewatch/releases/download/v0.2.0/flakewatch-v0.2.0-linux-amd64.tar.gz
-    tar -xzf /tmp/flakewatch.tar.gz -C /tmp
-    sudo install /tmp/flakewatch /usr/local/bin/flakewatch
-
 - name: Generate flakewatch report
   if: always()
-  run: |
-    flakewatch html \
-      --junit "test-results/**/*.xml" \
-      --output flakewatch.html \
-      --source-base-url "https://github.com/${{ github.repository }}/blob/${{ github.sha }}" \
-      --source-root "."
+  uses: komagata/flakewatch@v0.3.0
+  with:
+    junit: "test-results/**/*.xml"
+    output: flakewatch.html
 
 - name: Upload flakewatch report
   if: always()
@@ -80,6 +68,16 @@ HTML report:
 
 See `examples/github-actions.yml` for a complete workflow shape, including a
 job summary note that tells readers where to find the uploaded report.
+
+### Action Inputs
+
+| Input | Default | Description |
+|---|---|---|
+| `junit` | `test-results/**/*.xml` | JUnit XML glob. Use `**/*.xml` for recursive matching. |
+| `output` | `flakewatch.html` | HTML report output path. |
+| `source-base-url` | current GitHub commit URL | Base URL for source links. |
+| `source-root` | `.` | Local source root used to infer Ruby test line links. |
+| `version` | `v0.3.0` | Flakewatch release version to install. |
 
 ## Commands
 
