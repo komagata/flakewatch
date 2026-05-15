@@ -29,6 +29,8 @@ The report contains:
 
 - flaky tests: tests that appear with both passing and failing/error outcomes
   across the provided JUnit files
+- healed candidates: tests that had past pass/fail variation but whose 10 most
+  recent observations are all passing
 - slow tests: tests ranked by their maximum and average recorded duration
 - sortable tables: click columns such as `Fail`, `Max seconds`, or `Avg seconds`
   to reorder the visible rows
@@ -53,7 +55,7 @@ HTML report with the Flakewatch action:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.3.0
+  uses: komagata/flakewatch@v0.4.0
   with:
     junit: "test-results/**/*.xml"
     output: flakewatch.html
@@ -77,7 +79,7 @@ job summary note that tells readers where to find the uploaded report.
 | `output` | `flakewatch.html` | HTML report output path. |
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
-| `version` | `v0.3.0` | Flakewatch release version to install. |
+| `version` | `v0.4.0` | Flakewatch release version to install. |
 
 ## Commands
 
@@ -94,3 +96,6 @@ flakewatch doctor
 `--source-base-url` enables GitHub links in the report. `--source-root` points
 to the checked-out source tree and is used to infer Ruby test method line links
 when JUnit XML only includes a file path.
+
+Observation order is based on JUnit `testsuite timestamp` when present. If the
+XML has no timestamp, Flakewatch falls back to the sorted file path order.

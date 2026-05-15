@@ -34,11 +34,14 @@ class FlakewatchTest extends TestCase
   test_html_report_renders_flaky_and_slow_tests_without_database = ->
     html = Report.html_from_junit(["tests/fixtures/junit/**/*.xml"])
     self.assert(html.contains("<h2>Flaky Tests</h2>"), "flaky section")
+    self.assert(html.contains("<h2>Healed Candidates</h2>"), "healed section")
     self.assert(html.contains("<h2>Slow Tests</h2>"), "slow section")
     self.assert(html.contains("data-sort=\"number\">Fail</th>"), "sortable fail count")
     self.assert(html.contains("data-sort=\"number\">Max seconds</th>"), "sortable max seconds")
     self.assert(html.contains("querySelectorAll('th[data-sort]')"), "sort script")
     self.assert(html.contains("pkg.FlakyTest.alternates"), "flaky test")
+    self.assert(html.contains("pkg.HealedTest.recovers"), "healed test")
+    self.assert(html.contains("10 passed"), "healed recent status")
     self.assert(html.contains("pkg.AlwaysFailTest.fails"), "slow test")
 
   test_html_report_links_to_source_files = ->

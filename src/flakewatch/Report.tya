@@ -18,8 +18,8 @@ class Report
 
   static junit_rows = patterns ->
     by_test = {}
-    for path_name in JUnit.files(patterns)
-      for item in JUnit.parse_file(path_name)
+    for source in Self.junit_sources(patterns)
+      for item in source["items"]
         class_name = item["classname"]
         if class_name == ""
           class_name = item["suite"]
@@ -41,6 +41,7 @@ class Report
           row["max_duration"] = 0
           row["last_status"] = ""
           row["previous_passish"] = ""
+          row["recent_passish"] = []
           by_test[key] = row
         row = by_test[key]
         if row["file"] == "" and item["file"] != ""
@@ -54,6 +55,7 @@ class Report
         if row["previous_passish"] != "" and row["previous_passish"] != passish
           row["transition_count"] = row["transition_count"] + 1
         row["previous_passish"] = passish
+        row["recent_passish"].push(passish)
         row["observations"] = row["observations"] + 1
         if status == "passed"
           row["pass_count"] = row["pass_count"] + 1
@@ -76,11 +78,57 @@ class Report
       non_pass = row["fail_count"] + row["error_count"]
       if row["pass_count"] > 0 and non_pass > 0
         row["flake_score"] = 50 + row["transition_count"] * 10 + non_pass * 5
+      row["healed_score"] = 0
+      if row["flake_score"] > 0 and Self.recent_all_passed(row["recent_passish"], 10)
+        row["healed_score"] = row["flake_score"]
+        row["flake_score"] = 0
       rows.push(row)
     return rows
 
+  static junit_sources = patterns ->
+    sources = []
+    for path_name in JUnit.files(patterns)
+      items = JUnit.parse_file(path_name)
+      key = path_name
+      if items.len() > 0 and items[0]["timestamp"] != ""
+        key = items[0]["timestamp"] + " " + path_name
+      source = {}
+      source["path"] = path_name
+      source["key"] = key
+      source["items"] = items
+      sources.push(source)
+    return Self.top_sources(sources)
+
+  static top_sources = sources ->
+    out = []
+    used = {}
+    while out.len() < sources.len()
+      best = nil
+      best_index = -1
+      i = 0
+      while i < sources.len()
+        if used[i.to_s()] == nil
+          if best == nil or sources[i]["key"] < best["key"]
+            best = sources[i]
+            best_index = i
+        i = i + 1
+      used[best_index.to_s()] = "true"
+      out.push(best)
+    return out
+
+  static recent_all_passed = statuses, limit ->
+    if statuses.len() < limit
+      return false
+    i = statuses.len() - limit
+    while i < statuses.len()
+      if statuses[i] != "true"
+        return false
+      i = i + 1
+    return true
+
   static html = rows, source_base_url, source_root ->
     flaky = Self.top_rows(rows, "flake_score", 20)
+    healed = Self.top_rows(rows, "healed_score", 20)
     slow = Self.top_rows(rows, "max_duration", 20)
     source_cache = {}
     source_line_cache = {}
@@ -105,6 +153,7 @@ class Report
       + failures.to_s()
       + "</strong>failures/errors</div></div>"
     out = out + "<h2>Flaky Tests</h2>" + Self.flaky_table(flaky, source_base_url, source_root, source_cache, source_line_cache)
+    out = out + "<h2>Healed Candidates</h2>" + Self.healed_table(healed, source_base_url, source_root, source_cache, source_line_cache)
     out = out + "<h2>Slow Tests</h2>" + Self.slow_table(slow, source_base_url, source_root, source_cache, source_line_cache)
     out = out + Self.sort_script()
     out = out + "</body></html>"
@@ -136,6 +185,30 @@ class Report
           + "</td></tr>"
     if count == 0
       return "<div class=\"empty\">No flaky tests detected in these JUnit files.</div>"
+    return out + "</tbody></table>"
+
+  static healed_table = rows, source_base_url, source_root, source_cache, source_line_cache ->
+    out = "<table><thead><tr><th class=\"test-col\" data-sort=\"text\">Test</th><th class=\"num\" data-sort=\"number\">Score</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"num\" data-sort=\"number\">Pass</th><th class=\"num\" data-sort=\"number\">Fail</th><th class=\"num\" data-sort=\"number\">Error</th><th class=\"status\" data-sort=\"text\">Recent</th></tr></thead><tbody>"
+    count = 0
+    for row in rows
+      if row["healed_score"] > 0
+        count = count + 1
+        out = out
+          + "<tr><td>"
+          + Self.test_link(row, source_base_url, source_root, source_cache, source_line_cache)
+          + "</td><td class=\"num\">"
+          + row["healed_score"].to_s()
+          + "</td><td class=\"num\">"
+          + row["observations"].to_s()
+          + "</td><td class=\"num\">"
+          + row["pass_count"].to_s()
+          + "</td><td class=\"num\">"
+          + row["fail_count"].to_s()
+          + "</td><td class=\"num\">"
+          + row["error_count"].to_s()
+          + "</td><td class=\"status\">10 passed</td></tr>"
+    if count == 0
+      return "<div class=\"empty\">No healed candidates detected. A test must have past pass/fail variation and 10 most recent passing observations.</div>"
     return out + "</tbody></table>"
 
   static slow_table = rows, source_base_url, source_root, source_cache, source_line_cache ->

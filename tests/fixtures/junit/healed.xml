@@ -1,0 +1,15 @@
+<testsuite name="pkg" timestamp="2026-05-15T00:00:00Z">
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01">
+    <failure message="old failure">failure body</failure>
+  </testcase>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+  <testcase classname="pkg.HealedTest" name="recovers" time="0.01"/>
+</testsuite>

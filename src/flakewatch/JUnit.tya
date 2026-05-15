@@ -40,24 +40,25 @@ class JUnit
     cases = []
     suite_chunks = text.split("<testsuite ")
     if suite_chunks.len() == 1
-      JUnit.parse_cases(text, "", cases)
+      JUnit.parse_cases(text, "", "", cases)
     else
       i = 1
       while i < suite_chunks.len()
         chunk = suite_chunks[i]
         suite_name = JUnit.attr(chunk, "name", "")
-        JUnit.parse_cases(chunk, suite_name, cases)
+        suite_timestamp = JUnit.attr(chunk, "timestamp", "")
+        JUnit.parse_cases(chunk, suite_name, suite_timestamp, cases)
         i = i + 1
     return cases
 
-  static parse_cases = text, suite_name, cases ->
+  static parse_cases = text, suite_name, suite_timestamp, cases ->
     chunks = text.split("<testcase ")
     i = 1
     while i < chunks.len()
-      cases.push(JUnit.case_from(suite_name, chunks[i]))
+      cases.push(JUnit.case_from(suite_name, suite_timestamp, chunks[i]))
       i = i + 1
 
-  static case_from = suite_name, item ->
+  static case_from = suite_name, suite_timestamp, item ->
     status = "passed"
     message = ""
     body = ""
@@ -84,6 +85,7 @@ class JUnit
       stderr = JUnit.element_body(item.split("<system-err")[1], "system-err")
     out = {}
     out["suite"] = suite_name
+    out["timestamp"] = suite_timestamp
     out["classname"] = JUnit.attr(item, "classname", "")
     out["name"] = JUnit.attr(item, "name", "")
     out["file"] = JUnit.attr(item, "file", "")
