@@ -22,6 +22,22 @@ inputs:
     description: Flakewatch release version to install.
     required: false
     default: v0.4.0
+  upload-artifact:
+    description: Upload the generated HTML report as a GitHub Actions artifact.
+    required: false
+    default: "true"
+  artifact-name:
+    description: GitHub Actions artifact name for the generated HTML report.
+    required: false
+    default: flakewatch.html
+  update-pr-description:
+    description: Add or update a Flakewatch report link in the pull request description.
+    required: false
+    default: "true"
+  add-job-summary:
+    description: Add a Flakewatch report link to the GitHub Actions job summary.
+    required: false
+    default: "true"
 
 runs:
   using: composite
@@ -50,3 +66,92 @@ runs:
           --output "${{ inputs.output }}" \
           --source-base-url "$source_base_url" \
           --source-root "${{ inputs['source-root'] }}"
+
+    - name: Upload flakewatch report
+      id: upload-flakewatch-report
+      if: inputs.upload-artifact == 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.output }}
+        archive: false
+        if-no-files-found: error
+
+    - name: Add flakewatch summary
+      if: inputs.add-job-summary == 'true' && inputs.upload-artifact == 'true'
+      shell: bash
+      env:
+        REPORT_URL: ${{ steps.upload-flakewatch-report.outputs.artifact-url }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
+      run: |
+        {
+          echo "## Flakewatch"
+          echo ""
+          echo "[Download ${ARTIFACT_NAME}](${REPORT_URL})"
+          echo ""
+          echo "Download the single HTML artifact and open it in your browser."
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Update PR description with flakewatch report
+      if: github.event_name == 'pull_request' && inputs.update-pr-description == 'true' && inputs.upload-artifact == 'true'
+      continue-on-error: true
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPORT_URL: ${{ steps.upload-flakewatch-report.outputs.artifact-url }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
+      run: |
+        node <<'NODE'
+        const markerStart = "<!-- flakewatch-report:start -->"
+        const markerEnd = "<!-- flakewatch-report:end -->"
+        const apiUrl = process.env.GITHUB_API_URL || "https://api.github.com"
+        const repo = process.env.GITHUB_REPOSITORY
+        const prNumber = process.env.PR_NUMBER
+        const token = process.env.GITHUB_TOKEN
+        const artifactName = process.env.ARTIFACT_NAME
+        const reportUrl = process.env.REPORT_URL
+
+        const block = [
+          markerStart,
+          "## Flakewatch Report",
+          "",
+          `[Download ${artifactName}](${reportUrl})`,
+          "",
+          "Download the single HTML artifact and open it in your browser.",
+          markerEnd
+        ].join("\n")
+
+        const headers = {
+          "Accept": "application/vnd.github+json",
+          "Authorization": `Bearer ${token}`,
+          "X-GitHub-Api-Version": "2022-11-28"
+        }
+
+        const prUrl = `${apiUrl}/repos/${repo}/pulls/${prNumber}`
+        const response = await fetch(prUrl, { headers })
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PR body: ${response.status} ${await response.text()}`)
+        }
+
+        const pr = await response.json()
+        const body = (pr.body || "").trimEnd()
+        const pattern = /<!-- flakewatch-report:start -->[\s\S]*?<!-- flakewatch-report:end -->/
+
+        const nextBody = pattern.test(body)
+          ? body.replace(pattern, block)
+          : `${body}\n\n${block}`.trim()
+
+        const updateResponse = await fetch(prUrl, {
+          method: "PATCH",
+          headers: {
+            ...headers,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ body: `${nextBody}\n` })
+        })
+
+        if (!updateResponse.ok) {
+          throw new Error(`Failed to update PR body: ${updateResponse.status} ${await updateResponse.text()}`)
+        }
+        NODE
