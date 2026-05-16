@@ -2,8 +2,8 @@
 
 `flakewatch` turns JUnit XML test results into a static, self-contained HTML
 report for flaky and slow tests. It is designed for GitHub Actions: run your
-normal tests, point `flakewatch` at the generated JUnit XML files, and upload
-the HTML report as an artifact.
+normal tests, point `flakewatch` at the generated JUnit XML files, and it will
+generate, upload, and link the HTML report.
 
 The default HTML workflow does not need SQLite, a cache, or restored artifacts.
 
@@ -40,10 +40,13 @@ The report contains:
 
 ## GitHub Actions
 
-Configure your test command to write JUnit XML, then generate and upload the
-HTML report with the Flakewatch action:
+Configure your test command to write JUnit XML, then run the Flakewatch action:
 
 ```yaml
+permissions:
+  contents: read
+  pull-requests: write
+
 - uses: actions/checkout@v4
 
 - name: Run tests
@@ -58,18 +61,20 @@ HTML report with the Flakewatch action:
   uses: komagata/flakewatch@v0.4.0
   with:
     junit: "test-results/**/*.xml"
-    output: flakewatch.html
-
-- name: Upload flakewatch report
-  if: always()
-  uses: actions/upload-artifact@v4
-  with:
-    name: flakewatch-report
-    path: flakewatch.html
 ```
 
-See `examples/github-actions.yml` for a complete workflow shape, including a
-job summary note that tells readers where to find the uploaded report.
+By default, the action:
+
+- generates `flakewatch.html`
+- uploads it as a single-file artifact, not a zip archive
+- adds a download link to the job summary
+- adds or updates a `Flakewatch Report` block in the pull request description
+
+`pull-requests: write` is required only for updating the pull request
+description. If the token cannot update the pull request, the action keeps the
+CI job green and the job summary still links to the artifact.
+
+See `examples/github-actions.yml` for a complete workflow shape.
 
 ### Action Inputs
 
@@ -80,6 +85,10 @@ job summary note that tells readers where to find the uploaded report.
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
 | `version` | `v0.4.0` | Flakewatch release version to install. |
+| `upload-artifact` | `true` | Upload the generated HTML report as a GitHub Actions artifact. |
+| `artifact-name` | `flakewatch.html` | GitHub Actions artifact name for the generated HTML report. |
+| `update-pr-description` | `true` | Add or update a Flakewatch report link in the pull request description. |
+| `add-job-summary` | `true` | Add a Flakewatch report link to the GitHub Actions job summary. |
 
 ## Commands
 

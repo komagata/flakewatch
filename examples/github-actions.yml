@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -26,20 +30,3 @@ jobs:
         uses: komagata/flakewatch@v0.4.0
         with:
           junit: "test-results/**/*.xml"
-          output: flakewatch.html
-
-      - name: Upload flakewatch report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: flakewatch-report
-          path: flakewatch.html
-
-      - name: Add report link to job summary
-        if: always()
-        run: |
-          {
-            echo "## Flakewatch"
-            echo ""
-            echo "Open the \`flakewatch-report\` artifact from this workflow run to view flaky and slow test analysis."
-          } >> "$GITHUB_STEP_SUMMARY"
