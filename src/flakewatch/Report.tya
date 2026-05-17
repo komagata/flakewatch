@@ -16,8 +16,16 @@ class Report
     return Self.html_from_junit_with_source_root_and_history(patterns, [], source_base_url, source_root)
 
   static html_from_junit_with_source_root_and_history = patterns, history_patterns, source_base_url, source_root ->
-    rows = Self.rows_from_items(Self.history_items(history_patterns) + Self.junit_items(patterns))
+    rows = Self.rows_from_items(Self.combined_items(history_patterns, patterns))
     return Self.html(rows, source_base_url, source_root)
+
+  static combined_items = history_patterns, junit_patterns ->
+    out = []
+    for item in Self.history_items(history_patterns)
+      out.push(item)
+    for item in Self.junit_items(junit_patterns)
+      out.push(item)
+    return out
 
   static junit_rows = patterns ->
     return Self.rows_from_items(Self.junit_items(patterns))
