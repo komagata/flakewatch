@@ -48,3 +48,13 @@ class FlakewatchTest extends TestCase
     html = Report.html_from_junit_with_source(["tests/fixtures/junit/run1.xml"], "https://github.com/example/app/blob/abc123")
     self.assert(html.contains("https://github.com/example/app/blob/abc123/flaky_test.tya#L8"), "source link")
     self.assert(html.contains("https://github.com/example/app/blob/abc123/tests/fixtures/source/user_events_test.rb#L2"), "inferred source line")
+
+  test_jsonl_history_extends_html_observations = ->
+    history_path = "tmp/flakewatch-history.jsonl"
+    if file.File.exists?(history_path)
+      file.File.remove(history_path)
+    History.export_file({ output: history_path, junit: ["tests/fixtures/junit/run1.xml"], repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "a", branch: "main", event: "push" })
+    self.assert(file.File.read(history_path).contains("\"run_id\":\"1\""), "jsonl metadata")
+    html = Report.html_from_junit_with_source_root_and_history(["tests/fixtures/junit/run2.xml"], [history_path], "", ".")
+    self.assert(html.contains("<strong>7</strong>observations"), "history plus current observations")
+    self.assert(html.contains("pkg.FlakyTest.alternates"), "history creates flake signal")

@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.5.0
+    default: v0.6.0
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -38,6 +38,14 @@ inputs:
     description: Add a Flakewatch report link to the GitHub Actions job summary.
     required: false
     default: "true"
+  history-branch:
+    description: Git branch used to persist JSONL test history. Leave empty to disable persistent history.
+    required: false
+    default: ""
+  history-write:
+    description: Write JSONL history to history-branch. Use auto to write only outside pull_request events.
+    required: false
+    default: auto
 
 runs:
   using: composite
@@ -52,8 +60,37 @@ runs:
           sh "${{ github.action_path }}/install.sh"
         echo "$install_dir" >> "$GITHUB_PATH"
 
+    - name: Checkout flakewatch history
+      id: flakewatch-history
+      if: inputs.history-branch != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        HISTORY_BRANCH: ${{ inputs.history-branch }}
+      run: |
+        history_dir="${RUNNER_TEMP}/flakewatch-history"
+        mkdir -p "$history_dir"
+        git init "$history_dir"
+        cd "$history_dir"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+        if git fetch --depth=1 origin "${HISTORY_BRANCH}"; then
+          git checkout -B "${HISTORY_BRANCH}" "origin/${HISTORY_BRANCH}"
+        else
+          git checkout --orphan "${HISTORY_BRANCH}"
+          git rm -rf . || true
+        fi
+
+        mkdir -p history
+        echo "dir=${history_dir}" >> "$GITHUB_OUTPUT"
+        echo "pattern=${history_dir}/history/**/*.jsonl" >> "$GITHUB_OUTPUT"
+
     - name: Generate flakewatch report
       shell: bash
+      env:
+        HISTORY_PATTERN: ${{ steps.flakewatch-history.outputs.pattern }}
       run: |
         if [ -n "${{ inputs['source-base-url'] }}" ]; then
           source_base_url="${{ inputs['source-base-url'] }}"
@@ -61,11 +98,49 @@ runs:
           source_base_url="https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}"
         fi
 
-        flakewatch html \
-          --junit "${{ inputs.junit }}" \
-          --output "${{ inputs.output }}" \
-          --source-base-url "$source_base_url" \
+        args=(
+          html
+          --junit "${{ inputs.junit }}"
+          --output "${{ inputs.output }}"
+          --source-base-url "$source_base_url"
           --source-root "${{ inputs['source-root'] }}"
+        )
+
+        if [ -n "$HISTORY_PATTERN" ]; then
+          args+=(--history "$HISTORY_PATTERN")
+        fi
+
+        flakewatch "${args[@]}"
+
+    - name: Write flakewatch history
+      if: inputs.history-branch != '' && (inputs.history-write == 'true' || (inputs.history-write == 'auto' && github.event_name != 'pull_request'))
+      shell: bash
+      env:
+        HISTORY_DIR: ${{ steps.flakewatch-history.outputs.dir }}
+        HISTORY_BRANCH: ${{ inputs.history-branch }}
+      run: |
+        day="$(date -u +%Y/%m/%d)"
+        run_file="${HISTORY_DIR}/history/${day}/run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}.jsonl"
+        mkdir -p "$(dirname "$run_file")"
+
+        flakewatch jsonl \
+          --junit "${{ inputs.junit }}" \
+          --output "$run_file"
+
+        cd "$HISTORY_DIR"
+        git add history
+        git commit -m "Add flakewatch history for run ${GITHUB_RUN_ID}" || exit 0
+
+        for attempt in 1 2 3; do
+          if git push origin "HEAD:${HISTORY_BRANCH}"; then
+            exit 0
+          fi
+          git fetch --depth=1 origin "${HISTORY_BRANCH}"
+          git rebase "origin/${HISTORY_BRANCH}"
+          sleep "$((attempt * 2))"
+        done
+
+        git push origin "HEAD:${HISTORY_BRANCH}"
 
     - name: Upload flakewatch report
       id: upload-flakewatch-report

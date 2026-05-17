@@ -58,7 +58,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.5.0
+  uses: komagata/flakewatch@v0.6.0
   with:
     junit: "test-results/**/*.xml"
 ```
@@ -76,6 +76,37 @@ CI job green and the job summary still links to the artifact.
 
 See `examples/github-actions.yml` for a complete workflow shape.
 
+### Persistent History
+
+By default, Flakewatch analyzes only the JUnit XML files from the current
+workflow run. To detect flaky tests across runs, store compact JSONL history in
+a dedicated Git branch:
+
+```yaml
+permissions:
+  contents: write
+  pull-requests: write
+
+- name: Generate flakewatch report
+  if: always()
+  uses: komagata/flakewatch@v0.6.0
+  with:
+    junit: "test-results/**/*.xml"
+    history-branch: flakewatch-data
+```
+
+When `history-branch` is set, the action reads
+`history/**/*.jsonl` from that branch before generating the HTML report. It
+then writes the current run to a file such as:
+
+```text
+history/2026/05/18/run-123456789-attempt-1.jsonl
+```
+
+The default `history-write: auto` writes history only outside
+`pull_request` events. This lets trusted branch runs update the history while
+pull request runs can still read it when permissions allow.
+
 ### Action Inputs
 
 | Input | Default | Description |
@@ -84,20 +115,27 @@ See `examples/github-actions.yml` for a complete workflow shape.
 | `output` | `flakewatch.html` | HTML report output path. |
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
-| `version` | `v0.5.0` | Flakewatch release version to install. |
+| `version` | `v0.6.0` | Flakewatch release version to install. |
 | `upload-artifact` | `true` | Upload the generated HTML report as a GitHub Actions artifact. |
 | `artifact-name` | `flakewatch.html` | GitHub Actions artifact name for the generated HTML report. |
 | `update-pr-description` | `true` | Add or update a Flakewatch report link in the pull request description. |
 | `add-job-summary` | `true` | Add a Flakewatch report link to the GitHub Actions job summary. |
+| `history-branch` | empty | Git branch used to persist JSONL test history. |
+| `history-write` | `auto` | Write JSONL history to `history-branch`. `auto` writes outside pull request events. |
 
 ## Commands
 
 ```sh
 flakewatch html \
   --junit "test-results/**/*.xml" \
+  --history "flakewatch-history/history/**/*.jsonl" \
   --output flakewatch.html \
   --source-base-url "https://github.com/OWNER/REPO/blob/COMMIT_SHA" \
   --source-root "."
+
+flakewatch jsonl \
+  --junit "test-results/**/*.xml" \
+  --output "history/2026/05/18/run-123456789-attempt-1.jsonl"
 
 flakewatch doctor
 ```
