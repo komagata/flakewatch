@@ -13,6 +13,9 @@ class Cli
     if command == "html"
       Report.render_html_file(opts)
       return nil
+    if command == "jsonl"
+      History.export_file(opts)
+      return nil
     if command == "report"
       print(Report.render(Database.open(opts["db"]), opts["format"]))
       return nil
@@ -38,6 +41,7 @@ class Cli
     opts["command"] = "help"
     opts["db"] = "flakewatch.sqlite3"
     opts["junit"] = []
+    opts["history"] = []
     opts["format"] = "text"
     opts["output"] = "flakewatch.html"
     opts["source_base_url"] = ""
@@ -66,6 +70,9 @@ class Cli
       elseif arg == "--junit"
         i = i + 1
         opts["junit"].push(argv[i])
+      elseif arg == "--history"
+        i = i + 1
+        opts["history"].push(argv[i])
       elseif arg == "--format"
         i = i + 1
         opts["format"] = argv[i]
@@ -103,6 +110,9 @@ class Cli
   static usage = () ->
     println(
       "usage: flakewatch html --junit 'test-results/**/*.xml' --output flakewatch.html",
+    )
+    println(
+      "       flakewatch jsonl --junit 'test-results/**/*.xml' --output run.jsonl",
     )
     println(
       "       flakewatch <init|ingest|report|list|history|serve|doctor> --db PATH",
