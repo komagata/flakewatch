@@ -107,6 +107,26 @@ The default `history-write: auto` writes history only outside
 `pull_request` events. This lets trusted branch runs update the history while
 pull request runs can still read it when permissions allow.
 
+If you want pull request runs to write history too, opt in explicitly:
+
+```yaml
+permissions:
+  contents: write
+  pull-requests: write
+
+- name: Generate flakewatch report
+  if: always()
+  uses: komagata/flakewatch@v0.6.0
+  with:
+    junit: "test-results/**/*.xml"
+    history-branch: flakewatch-data
+    history-write: true
+```
+
+With the default `history-write: auto`, pull request runs that set
+`history-branch` emit a GitHub Actions warning so the skipped history write is
+visible in the job log.
+
 ### Action Inputs
 
 | Input | Default | Description |
