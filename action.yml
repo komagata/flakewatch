@@ -198,7 +198,7 @@ runs:
           markerStart,
           "## Flakewatch Report",
           "",
-          `[![Flakewatch Report](${bannerUrl})](${reportUrl})`,
+          `<a href="${reportUrl}"><img src="${bannerUrl}" alt="Flakewatch Report" width="300"></a>`,
           "",
           `[Download ${artifactName}](${reportUrl})`,
           "",
