@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y libuv1-dev
+
+      - name: Install Tya
+        run: |
+          curl -L https://github.com/komagata/tya/releases/download/v0.62.0/tya-v0.62.0-linux-amd64.tar.gz | tar xz
+          cd tya-v0.62.0-linux-amd64
+          PREFIX="$RUNNER_TEMP/tya" ./install.sh
+          echo "$RUNNER_TEMP/tya/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: |
+          tya install
+          rm -rf .tya/cache
+
+      - name: Run tests
+        run: |
+          mkdir -p tmp
+          tya test
+
+      - name: Lint
+        run: tya lint src tests
+
+      - name: Generate flakewatch report
+        if: always()
+        uses: ./
+        with:
+          version: local
+          junit: "tests/fixtures/junit/**/*.xml"

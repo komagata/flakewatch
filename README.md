@@ -31,9 +31,10 @@ The report contains:
   across the provided JUnit files
 - healed candidates: tests that had past pass/fail variation but whose 10 most
   recent observations are all passing
+- failing tests: tests ranked by total failure and error observations
 - slow tests: tests ranked by their maximum and average recorded duration
-- sortable tables: click columns such as `Fail`, `Max seconds`, or `Avg seconds`
-  to reorder the visible rows
+- sortable tables: click columns such as `Failures`, `Max seconds`, or
+  `Avg seconds` to reorder the visible rows
 - source links: file links from JUnit XML, with inferred Ruby test line links
   when the XML omits line numbers
 - run summary: total tests, observations, and failures/errors
