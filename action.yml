@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.5
+    default: v0.6.6
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
