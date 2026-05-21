@@ -55,9 +55,14 @@ runs:
       run: |
         install_dir="${RUNNER_TEMP}/flakewatch"
         mkdir -p "$install_dir"
-        FLAKEWATCH_VERSION="${{ inputs.version }}" \
-          FLAKEWATCH_INSTALL_DIR="$install_dir" \
-          sh "${{ github.action_path }}/install.sh"
+        if [ "${{ inputs.version }}" = "local" ]; then
+          cd "${{ github.action_path }}"
+          tya build src/main.tya -o "$install_dir/flakewatch"
+        else
+          FLAKEWATCH_VERSION="${{ inputs.version }}" \
+            FLAKEWATCH_INSTALL_DIR="$install_dir" \
+            sh "${{ github.action_path }}/install.sh"
+        fi
         echo "$install_dir" >> "$GITHUB_PATH"
 
     - name: Checkout flakewatch history
