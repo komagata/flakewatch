@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.3
+    default: v0.6.4
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -198,7 +198,7 @@ runs:
           markerStart,
           "## Flakewatch Report",
           "",
-          `<a href="${reportUrl}"><img src="${bannerUrl}" alt="Flakewatch Report" width="240"></a>`,
+          `<a href="${reportUrl}"><img src="${bannerUrl}" alt="Flakewatch Report" width="180"></a>`,
           markerEnd
         ].join("\n")
 

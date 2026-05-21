@@ -27,6 +27,6 @@ jobs:
 
       - name: Generate flakewatch report
         if: always()
-        uses: komagata/flakewatch@v0.6.3
+        uses: komagata/flakewatch@v0.6.4
         with:
           junit: "test-results/**/*.xml"
