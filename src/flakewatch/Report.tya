@@ -245,22 +245,21 @@ class Report
     out = "<table><thead><tr><th class=\"test-col\" data-sort=\"text\">Test</th><th class=\"num\" data-sort=\"number\">Max seconds</th><th class=\"num\" data-sort=\"number\">Avg seconds</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"status\" data-sort=\"text\">Last</th></tr></thead><tbody>"
     count = 0
     for row in rows
-      if row["max_duration"] > 0
-        count = count + 1
-        out = out
-          + "<tr><td>"
-          + Self.test_link(row, source_base_url, source_root, source_cache, source_line_cache)
-          + "</td><td class=\"num\">"
-          + row["max_duration"].to_s()
-          + "</td><td class=\"num\">"
-          + row["avg_duration"].to_s()
-          + "</td><td class=\"num\">"
-          + row["observations"].to_s()
-          + "</td><td class=\"status\">"
-          + Self.escape(row["last_status"])
-          + "</td></tr>"
+      count = count + 1
+      out = out
+        + "<tr><td>"
+        + Self.test_link(row, source_base_url, source_root, source_cache, source_line_cache)
+        + "</td><td class=\"num\">"
+        + row["max_duration"].to_s()
+        + "</td><td class=\"num\">"
+        + row["avg_duration"].to_s()
+        + "</td><td class=\"num\">"
+        + row["observations"].to_s()
+        + "</td><td class=\"status\">"
+        + Self.escape(row["last_status"])
+        + "</td></tr>"
     if count == 0
-      return "<div class=\"empty\">No timed tests found in these JUnit files.</div>"
+      return "<div class=\"empty\">No tests found in these JUnit files.</div>"
     return out + "</tbody></table>"
 
   static failing_table = rows, source_base_url, source_root, source_cache, source_line_cache ->

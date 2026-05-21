@@ -58,6 +58,12 @@ class FlakewatchTest extends TestCase
     self.assert(html.contains("10 passed"), "healed recent status")
     self.assert(html.contains("pkg.AlwaysFailTest.fails"), "slow test")
 
+  test_html_report_ranks_tests_without_time_as_zero_seconds = ->
+    html = Report.html_from_junit(["tests/fixtures/junit/no_time.xml"])
+    self.assert(html.contains("<h2>Slow Tests</h2>"), "slow section")
+    self.assert(html.contains("pkg.NoTimeTest.still_ranks"), "zero duration test")
+    self.assert(html.contains("<td class=\"num\">0</td>"), "zero seconds")
+
   test_html_report_links_to_source_files = ->
     html = Report.html_from_junit_with_source(["tests/fixtures/junit/run1.xml"], "https://github.com/example/app/blob/abc123")
     self.assert(html.contains("https://github.com/example/app/blob/abc123/flaky_test.tya#L8"), "source link")

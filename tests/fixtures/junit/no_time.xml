@@ -1,0 +1,3 @@
+<testsuite name="pkg">
+  <testcase classname="pkg.NoTimeTest" name="still_ranks"/>
+</testsuite>
