@@ -2,11 +2,10 @@
 
 ## Project Structure & Module Organization
 
-`flakewatch` is a Tya CLI for ingesting JUnit XML into SQLite and reporting flaky tests. The entrypoint is `src/main.tya`, which imports the package modules under `src/flakewatch/`.
+`flakewatch` is a Tya CLI for turning JUnit XML and optional JSONL history into static reports for flaky tests. The entrypoint is `src/main.tya`, which imports the package modules under `src/flakewatch/`.
 
 - `src/flakewatch/Cli.tya`: command parsing and CLI dispatch.
-- `src/flakewatch/Database.tya`: SQLite connection, schema migration, and persistence helpers.
-- `src/flakewatch/JUnit.tya`, `Ingest.tya`, `Score.tya`, `Report.tya`, `Server.tya`: parsing, ingestion, scoring, reporting, and local HTTP output.
+- `src/flakewatch/JUnit.tya`, `History.tya`, `Report.tya`: JUnit parsing, JSONL history, scoring, and static report output.
 - `tests/flakewatch_test.tya`: project tests.
 - `tests/fixtures/junit/`: sample JUnit XML inputs.
 - `assets/` and `examples/`: reserved for user-facing assets and runnable examples.
@@ -38,10 +37,10 @@ Run `tya format -w` on files you edit. Lint may surface existing canonical `Self
 
 ## Testing Guidelines
 
-Tests use Tya’s built-in `unittest` framework. Name test methods with the `test_...` prefix and keep fixtures under `tests/fixtures/`. Add or update focused tests when changing JUnit parsing, HTML reporting, ingestion idempotency, scoring, or CLI behavior. Use `tmp/` for generated reports and disposable SQLite databases.
+Tests use Tya’s built-in `unittest` framework. Name test methods with the `test_...` prefix and keep fixtures under `tests/fixtures/`. Add or update focused tests when changing JUnit parsing, HTML reporting, JSONL history, scoring, or CLI behavior. Use `tmp/` for generated reports and disposable JSONL files.
 
 ## Commit & Pull Request Guidelines
 
-Recent commits use short imperative English subjects, for example `Add Flakewatch CLI` and `Use released SQLite package dependency`. Keep commits focused on one behavior change. For this namespace, commit as `Masaki Komagata <komagata@gmail.com>`.
+Recent commits use short imperative English subjects, for example `Add Flakewatch CLI` and `Render static HTML report`. Keep commits focused on one behavior change. For this namespace, commit as `Masaki Komagata <komagata@gmail.com>`.
 
-Pull requests should include a concise summary, test results such as `tya test`, linked issues when applicable, and screenshots or copied output for report/server UI changes.
+Pull requests should include a concise summary, test results such as `tya test`, linked issues when applicable, and screenshots or copied output for report UI changes.

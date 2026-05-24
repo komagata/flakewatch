@@ -1,0 +1,121 @@
+import os
+import cli as cli
+
+class Cli
+  initialize = ->
+    self.report = Report()
+    self.history = History()
+
+  main = argv ->
+    opts = self.parse(argv)
+    command = opts["command"]
+    if command == "html"
+      self.report.render_html_file(opts)
+      return nil
+    if command == "jsonl"
+      self.history.export_file(opts)
+      return nil
+    if command == "doctor"
+      println("xml: ok")
+      println("github_actions: " + self.env_or("GITHUB_ACTIONS", "false"))
+      return nil
+    self.usage()
+    Os.exit(1)
+
+  parse = argv ->
+    command = "help"
+    if argv.len() > 0
+      command = argv[0]
+    args = []
+    i = 1
+    while i < argv.len()
+      args.push(argv[i])
+      i = i + 1
+    parsed = self.parse_options_or_exit(args, self.option_spec())
+    options = parsed["options"]
+    opts =
+      command: command
+      junit: options["junit"]
+      history: options["history"]
+      output: options["output"]
+      source_base_url: options["source-base-url"]
+      source_root: options["source-root"]
+      repo: options["repo"]
+      workflow: options["workflow"]
+      run_id: options["run-id"]
+      run_attempt: options["run-attempt"]
+      job: options["job"]
+      sha: options["sha"]
+      branch: options["branch"]
+      event: options["event"]
+      os: options["os"]
+      runtime: options["runtime"]
+      started_at: options["started-at"]
+    return opts
+
+  option_spec = ->
+    options = {}
+    options["junit"] = self.option("array", [])
+    options["history"] = self.option("array", [])
+    options["output"] = self.option("string", "flakewatch.html")
+    options["source-base-url"] = self.option("string", "")
+    options["source-root"] = self.option("string", ".")
+    options["repo"] = self.option(
+      "string",
+      self.env_or("GITHUB_REPOSITORY", "local")
+    )
+    options["workflow"] = self.option(
+      "string",
+      self.env_or("GITHUB_WORKFLOW", "local")
+    )
+    options["run-id"] = self.option(
+      "string",
+      self.env_or("GITHUB_RUN_ID", "local")
+    )
+    options["run-attempt"] = self.option(
+      "string",
+      self.env_or("GITHUB_RUN_ATTEMPT", "1")
+    )
+    options["job"] = self.option("string", self.env_or("GITHUB_JOB", "local"))
+    options["sha"] = self.option("string", self.env_or("GITHUB_SHA", ""))
+    options["branch"] = self.option(
+      "string",
+      self.env_or("GITHUB_REF_NAME", "")
+    )
+    options["event"] = self.option(
+      "string",
+      self.env_or("GITHUB_EVENT_NAME", "")
+    )
+    options["os"] = self.option("string", self.env_or("RUNNER_OS", ""))
+    options["runtime"] = self.option("string", "")
+    options["started-at"] = self.option("string", "")
+    spec = { command: "flakewatch", options: options }
+    return spec
+
+  option = typ, default_value ->
+    opt = { type: typ, default: default_value }
+    return opt
+
+  parse_options_or_exit = args, spec ->
+    result = cli.Cli.parse(args, spec)
+    if result["errors"].len() > 0
+      self.usage()
+      for err in result["errors"]
+        println(err["message"])
+      Os.exit(1)
+    return result
+
+  env_or = name, fallback ->
+    value = Os.env(name)
+    if value == nil or value == ""
+      return fallback
+    return value
+
+  usage = ->
+    println(
+      "usage: flakewatch html --junit 'test-results/**/*.xml' --output flakewatch.html"
+    )
+    println(
+      "       flakewatch jsonl --junit 'test-results/**/*.xml' --output run.jsonl"
+    )
+    println("       flakewatch doctor")

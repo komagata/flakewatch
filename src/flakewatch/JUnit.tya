@@ -1,123 +1,96 @@
-import file as file
-import path as path
-import dir as dir
+import dir
+import file
+import path
+
+import xml
 
 class JUnit
-  static files = patterns ->
+  initialize = ->
+    self.path_finder = JUnitPathFinder()
+
+  files = patterns ->
+    return self.path_finder.files(patterns)
+
+  parse_file = path_name ->
+    return self.parse(File.read(path_name))
+
+  parse = text ->
+    cases = []
+    root = Xml.parse(text).root()
+    if root.name == "testsuite"
+      self.parse_suite(root, cases)
+    else
+      for child_suite in root.find_all("testsuite")
+        self.parse_suite(child_suite, cases)
+    return cases
+
+  parse_suite = suite, cases ->
+    suite_name = suite.attr("name", "")
+    suite_timestamp = suite.attr("timestamp", "")
+    for item in suite.find_all("testcase")
+      cases.push(self.case_from(suite_name, suite_timestamp, item))
+
+  case_from = suite_name, suite_timestamp, item ->
+    status = "passed"
+    message = ""
+    body = ""
+    failure = item.find("failure")
+    error_item = item.find("error")
+    skipped = item.find("skipped")
+    if failure != nil
+      status = "failed"
+      message = failure.attr("message", "")
+      body = failure.text()
+    if error_item != nil
+      status = "error"
+      message = error_item.attr("message", message)
+      body = error_item.text()
+    if skipped != nil and status == "passed"
+      status = "skipped"
+      message = skipped.attr("message", "")
+      body = skipped.text()
+    stdout = ""
+    stderr = ""
+    system_out = item.find("system-out")
+    system_err = item.find("system-err")
+    if system_out != nil
+      stdout = system_out.text()
+    if system_err != nil
+      stderr = system_err.text()
+    out =
+      suite: suite_name
+      timestamp: suite_timestamp
+      classname: item.attr("classname", "")
+      name: item.attr("name", "")
+      file: item.attr("file", "")
+      line: item.attr("line", "")
+      duration: item.attr("time", "0").to_f()
+      status: status
+      message: message
+      body: body
+      system_out: stdout
+      system_err: stderr
+    return out
+
+class JUnitPathFinder
+  files = patterns ->
     out = []
     for pattern in patterns
       if pattern.contains("**/*.xml")
         base = pattern.split("**/*.xml")[0]
         if base.ends_with("/")
-          base = JUnit.slice(base, 0, base.byte_len() - 1)
-        JUnit.collect_xml(base, out)
+          base = base.slice(0, base.byte_len() - 1)
+        self.collect_xml(base, out)
       else
         out.push(pattern)
     return out
 
-  static collect_xml = root, out ->
+  collect_xml = root, out ->
     if root == ""
       root = "."
-    for name in dir.Dir.list(root)
-      full = path.Path.join([root, name])
+    for name in Dir.list(root)
+      full = Path.join([root, name])
       if name.ends_with(".xml")
         out.push(full)
       elseif not name.contains(".")
-        JUnit.collect_xml(full, out)
-
-  static slice = text, start, finish ->
-    out = ""
-    i = start
-    while i < finish
-      out = out + text[i]
-      i = i + 1
-    return out
-
-  static parse_file = path_name ->
-    return JUnit.parse(file.File.read(path_name))
-
-  static parse = text ->
-    cases = []
-    suite_chunks = text.split("<testsuite ")
-    if suite_chunks.len() == 1
-      JUnit.parse_cases(text, "", "", cases)
-    else
-      i = 1
-      while i < suite_chunks.len()
-        chunk = suite_chunks[i]
-        suite_name = JUnit.attr(chunk, "name", "")
-        suite_timestamp = JUnit.attr(chunk, "timestamp", "")
-        JUnit.parse_cases(chunk, suite_name, suite_timestamp, cases)
-        i = i + 1
-    return cases
-
-  static parse_cases = text, suite_name, suite_timestamp, cases ->
-    chunks = text.split("<testcase ")
-    i = 1
-    while i < chunks.len()
-      cases.push(JUnit.case_from(suite_name, suite_timestamp, chunks[i]))
-      i = i + 1
-
-  static case_from = suite_name, suite_timestamp, item ->
-    status = "passed"
-    message = ""
-    body = ""
-    if item.contains("<failure")
-      status = "failed"
-      failure = item.split("<failure")[1]
-      message = JUnit.attr(failure, "message", "")
-      body = JUnit.element_body(failure, "failure")
-    if item.contains("<error")
-      status = "error"
-      error = item.split("<error")[1]
-      message = JUnit.attr(error, "message", message)
-      body = JUnit.element_body(error, "error")
-    if item.contains("<skipped") and status == "passed"
-      status = "skipped"
-      skipped = item.split("<skipped")[1]
-      message = JUnit.attr(skipped, "message", "")
-      body = JUnit.element_body(skipped, "skipped")
-    stdout = ""
-    stderr = ""
-    if item.contains("<system-out")
-      stdout = JUnit.element_body(item.split("<system-out")[1], "system-out")
-    if item.contains("<system-err")
-      stderr = JUnit.element_body(item.split("<system-err")[1], "system-err")
-    out = {}
-    out["suite"] = suite_name
-    out["timestamp"] = suite_timestamp
-    out["classname"] = JUnit.attr(item, "classname", "")
-    out["name"] = JUnit.attr(item, "name", "")
-    out["file"] = JUnit.attr(item, "file", "")
-    out["line"] = JUnit.attr(item, "line", "")
-    out["duration"] = JUnit.attr(item, "time", "0").to_f()
-    out["status"] = status
-    out["message"] = message
-    out["body"] = body
-    out["system_out"] = stdout
-    out["system_err"] = stderr
-    return out
-
-  static attr = text, name, fallback ->
-    marker = name + "=\""
-    parts = []
-    if text.starts_with(marker)
-      parts = text.split(marker)
-    else
-      parts = text.split(" " + marker)
-      if parts.len() < 2
-        parts = text.split("\n" + marker)
-      if parts.len() < 2
-        parts = text.split("\t" + marker)
-    if parts.len() < 2
-      return fallback
-    return parts[1].split("\"")[0]
-
-  static element_body = text, name ->
-    parts = text.split(">")
-    if parts.len() < 2
-      return ""
-    body = parts[1].split("</" + name)[0]
-    body = body.replace("<![CDATA[", "")
-    body = body.replace("]]", "")
-    return body
+        self.collect_xml(full, out)

@@ -5,7 +5,7 @@ report for flaky and slow tests. It is designed for GitHub Actions: run your
 normal tests, point `flakewatch` at the generated JUnit XML files, and it will
 generate, upload, and link the HTML report.
 
-The default HTML workflow does not need SQLite, a cache, or restored artifacts.
+The default HTML workflow does not need a cache or restored artifacts.
 
 ## Quick start
 

@@ -1,93 +1,81 @@
-import file as file
-import dir as dir
-import path as path
-import json as json
+import dir
+import file
+import json
+import path
 
 class History
-  static export_file = opts ->
+  initialize = ->
+    self.junit = JUnit()
+
+  export_file = opts ->
     lines = []
-    for item in Self.items_from_junit(opts)
-      lines.push(json.Json.dump(item))
-    file.File.write(opts["output"], lines.join("\n") + "\n")
+    for item in self.items_from_junit(opts)
+      lines.push(Json.dump(item))
+    File.write(opts["output"], lines.join("\n") + "\n")
     println("wrote " + opts["output"])
 
-  static items_from_junit = opts ->
+  items_from_junit = opts ->
     out = []
-    for path_name in JUnit.files(opts["junit"])
-      for item in JUnit.parse_file(path_name)
-        record = Self.record(opts, path_name, item)
+    for path_name in self.junit.files(opts["junit"])
+      for item in self.junit.parse_file(path_name)
+        record = self.record(opts, path_name, item)
         out.push(record)
-    return Self.sort_paths(out)
+    return self.sort_paths(out)
 
-  static record = opts, junit_path, item ->
-    out = {}
-    out["repo"] = opts["repo"]
-    out["workflow"] = opts["workflow"]
-    out["run_id"] = opts["run_id"]
-    out["run_attempt"] = opts["run_attempt"]
-    out["job"] = opts["job"]
-    out["sha"] = opts["sha"]
-    out["branch"] = opts["branch"]
-    out["event"] = opts["event"]
-    out["junit_path"] = junit_path
-    out["suite"] = item["suite"]
-    out["timestamp"] = item["timestamp"]
-    out["classname"] = item["classname"]
-    out["name"] = item["name"]
-    out["file"] = item["file"]
-    out["line"] = item["line"]
-    out["duration"] = item["duration"]
-    out["status"] = item["status"]
-    out["message"] = item["message"]
+  record = opts, junit_path, item ->
+    out =
+      repo: opts["repo"]
+      workflow: opts["workflow"]
+      run_id: opts["run_id"]
+      run_attempt: opts["run_attempt"]
+      job: opts["job"]
+      sha: opts["sha"]
+      branch: opts["branch"]
+      event: opts["event"]
+      junit_path: junit_path
+      suite: item["suite"]
+      timestamp: item["timestamp"]
+      classname: item["classname"]
+      name: item["name"]
+      file: item["file"]
+      line: item["line"]
+      duration: item["duration"]
+      status: item["status"]
+      message: item["message"]
     return out
 
-  static items_from_jsonl = patterns ->
+  items_from_jsonl = patterns ->
     out = []
-    for path_name in Self.files(patterns)
-      text = file.File.read(path_name)
+    for path_name in self.files(patterns)
+      text = File.read(path_name)
       for line in text.split("\n")
         if line != ""
-          out.push(json.Json.parse(line))
+          out.push(Json.parse(line))
     return out
 
-  static files = patterns ->
+  files = patterns ->
     out = []
     for pattern in patterns
       if pattern.contains("**/*.jsonl")
         base = pattern.split("**/*.jsonl")[0]
         if base.ends_with("/")
-          base = JUnit.slice(base, 0, base.byte_len() - 1)
-        Self.collect_jsonl(base, out)
-      else
-        if file.File.exists?(pattern)
-          out.push(pattern)
+          base = base.slice(0, base.byte_len() - 1)
+        self.collect_jsonl(base, out)
+      elseif File.exists?(pattern)
+        out.push(pattern)
     return out
 
-  static collect_jsonl = root, out ->
+  collect_jsonl = root, out ->
     if root == ""
       root = "."
-    if not file.File.exists?(root)
+    if not File.exists?(root)
       return nil
-    for name in dir.Dir.list(root)
-      full = path.Path.join([root, name])
+    for name in Dir.list(root)
+      full = Path.join([root, name])
       if name.ends_with(".jsonl")
         out.push(full)
       elseif not name.contains(".")
-        Self.collect_jsonl(full, out)
+        self.collect_jsonl(full, out)
 
-  static sort_paths = paths ->
-    out = []
-    used = {}
-    while out.len() < paths.len()
-      best = ""
-      best_index = -1
-      i = 0
-      while i < paths.len()
-        if used[i.to_s()] == nil
-          if best_index == -1 or paths[i] < best
-            best = paths[i]
-            best_index = i
-        i = i + 1
-      used[best_index.to_s()] = "true"
-      out.push(best)
-    return out
+  sort_paths = paths ->
+    return paths
