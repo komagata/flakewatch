@@ -56,17 +56,18 @@ class Report
   rows_from_items = items ->
     by_test = {}
     for item in items
-      class_name = item["classname"]
+      class_name = item["classname"].to_s()
       if class_name == ""
-        class_name = item["suite"]
-      key = class_name + "." + item["name"]
+        class_name = item["suite"].to_s()
+      test_name = item["name"].to_s()
+      key = class_name + "." + test_name
       if by_test[key] == nil
         row =
           name: key
-          test_name: item["name"]
-          suite: item["suite"]
-          file: item["file"]
-          line: item["line"]
+          test_name: test_name
+          suite: item["suite"].to_s()
+          file: item["file"].to_s()
+          line: item["line"].to_s()
           observations: 0
           pass_count: 0
           fail_count: 0
@@ -81,11 +82,12 @@ class Report
           recent_passish: []
         by_test[key] = row
       row = by_test[key]
-      if row["file"] == "" and item["file"] != ""
-        row["file"] = item["file"]
-      if row["line"] == "" and item["file"] != ""
-        row["line"] = item["line"]
-      status = item["status"]
+      item_file = item["file"].to_s()
+      if row["file"] == "" and item_file != ""
+        row["file"] = item_file
+      if row["line"] == "" and item_file != ""
+        row["line"] = item["line"].to_s()
+      status = item["status"].to_s()
       passish = "false"
       if status == "passed" or status == "skipped"
         passish = "true"
