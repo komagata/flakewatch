@@ -4,7 +4,7 @@ import unittest
 import flakewatch
 
 class FlakewatchTest extends TestCase
-  test_cli_parse_uses_typed_options = () ->
+  test_cli_parse_uses_typed_options = ->
     opts = Cli().parse(
       ["html", "--junit", "run1.xml", "--junit", "run2.xml", "--history", "history/**/*.jsonl", "--source-base-url", "https://example.test/repo/blob/sha", "--source-root", "app", "--run-id", "123", "--started-at", "2026-05-21T00:00:00Z"]
     )
@@ -21,30 +21,31 @@ class FlakewatchTest extends TestCase
     self.assert_equal("123", opts["run_id"], "metadata option")
     self.assert_equal("2026-05-21T00:00:00Z", opts["started_at"], "started_at")
 
-  test_junit_parse_testsuite_and_testsuites = () ->
-    one = JUnit().parse_file("tests/fixtures/junit/run1.xml")
-    two = JUnit().parse_file("tests/fixtures/junit/run2.xml")
-    self.assert_equal(4, one.len(), "testsuite")
-    self.assert_equal(3, two.len(), "testsuites")
-    self.assert_equal("failed", one[1]["status"], "failure")
-    self.assert_equal("stack trace", one[1]["body"], "cdata")
-    self.assert_equal("stdout text", one[1]["system_out"], "stdout")
-    self.assert_equal("stderr text", one[1]["system_err"], "stderr")
-    self.assert_equal("skipped", one[2]["status"], "skipped")
-    self.assert_equal("error", two[2]["status"], "error")
+  test_html_report_links_to_source_files = ->
+    html = Report().html_from_junit_with_source(
+      ["tests/fixtures/junit/run1.xml"],
+      "https://github.com/example/app/blob/abc123"
+    )
+    self.assert(
+      html.contains("https://github.com/example/app/blob/abc123/flaky_test.tya#L8"),
+      "source link"
+    )
+    self.assert(
+      html.contains("https://github.com/example/app/blob/abc123/tests/fixtures/source/user_events_test.rb#L2"),
+      "inferred source line"
+    )
 
-  test_junit_parse_single_quoted_attributes = () ->
-    cases = JUnit().parse_file("tests/fixtures/junit/single_quote.xml")
-    self.assert_equal(1, cases.len(), "case count")
-    self.assert_equal("pkg", cases[0]["suite"], "suite")
-    self.assert_equal("2026-05-25T00:00:00Z", cases[0]["timestamp"], "timestamp")
-    self.assert_equal("pkg.SingleQuoteTest", cases[0]["classname"], "classname")
-    self.assert_equal("reads_single_quoted_attrs", cases[0]["name"], "name")
-    self.assert_equal("single_quote_test.tya", cases[0]["file"], "file")
-    self.assert_equal("9", cases[0]["line"], "line")
-    self.assert_equal(1.23, cases[0]["duration"], "duration")
+  test_html_report_ranks_tests_without_time_as_zero_seconds = ->
+    html = Report().html_from_junit(["tests/fixtures/junit/no_time.xml"])
+    self.assert(html.contains("<h2>Slow Tests</h2>"), "slow section")
+    self.assert(
+      html.contains("pkg.NoTimeTest.still_ranks"),
+      "zero duration test"
+    )
+    self.assert(html.contains("<td class=\"num\">0</td>"), "zero seconds")
+    self.assert(html.contains("<strong>0</strong>slow tests"), "slow count")
 
-  test_html_report_renders_flaky_and_slow_tests_without_database = () ->
+  test_html_report_renders_flaky_and_slow_tests_without_database = ->
     html = Report().html_from_junit(["tests/fixtures/junit/**/*.xml"])
     self.assert(html.contains("<h2>Flaky Tests</h2>"), "flaky section")
     self.assert(html.contains("<h2>Healed Candidates</h2>"), "healed section")
@@ -66,37 +67,18 @@ class FlakewatchTest extends TestCase
       html.contains("querySelectorAll('th[data-sort]')"),
       "sort script"
     )
+    self.assert(html.contains("<style>"), "embedded style")
+    self.assert(
+      html.contains(".metric strong" + chr(123) + "display:block;font-size:28px" + chr(125)),
+      "metric style"
+    )
     self.assert(html.contains("pkg.FlakyTest.alternates"), "flaky test")
     self.assert(html.contains("pkg.HealedTest.recovers"), "healed test")
     self.assert(html.contains("10 passed"), "healed recent status")
     self.assert(html.contains("pkg.AlwaysFailTest.fails"), "slow test")
     self.assert(html.contains("<strong>6</strong>slow tests"), "slow count")
 
-  test_html_report_ranks_tests_without_time_as_zero_seconds = () ->
-    html = Report().html_from_junit(["tests/fixtures/junit/no_time.xml"])
-    self.assert(html.contains("<h2>Slow Tests</h2>"), "slow section")
-    self.assert(
-      html.contains("pkg.NoTimeTest.still_ranks"),
-      "zero duration test"
-    )
-    self.assert(html.contains("<td class=\"num\">0</td>"), "zero seconds")
-    self.assert(html.contains("<strong>0</strong>slow tests"), "slow count")
-
-  test_html_report_links_to_source_files = () ->
-    html = Report().html_from_junit_with_source(
-      ["tests/fixtures/junit/run1.xml"],
-      "https://github.com/example/app/blob/abc123"
-    )
-    self.assert(
-      html.contains("https://github.com/example/app/blob/abc123/flaky_test.tya#L8"),
-      "source link"
-    )
-    self.assert(
-      html.contains("https://github.com/example/app/blob/abc123/tests/fixtures/source/user_events_test.rb#L2"),
-      "inferred source line"
-    )
-
-  test_jsonl_history_extends_html_observations = () ->
+  test_jsonl_history_extends_html_observations = ->
     history_path = "tmp/flakewatch-history.jsonl"
     if File.exists?(history_path)
       File.remove(history_path)
@@ -113,3 +95,30 @@ class FlakewatchTest extends TestCase
       html.contains("pkg.FlakyTest.alternates"),
       "history creates flake signal"
     )
+
+  test_junit_parse_single_quoted_attributes = ->
+    cases = JUnit().parse_file("tests/fixtures/junit/single_quote.xml")
+    self.assert_equal(1, cases.len(), "case count")
+    self.assert_equal("pkg", cases[0]["suite"], "suite")
+    self.assert_equal(
+      "2026-05-25T00:00:00Z",
+      cases[0]["timestamp"],
+      "timestamp"
+    )
+    self.assert_equal("pkg.SingleQuoteTest", cases[0]["classname"], "classname")
+    self.assert_equal("reads_single_quoted_attrs", cases[0]["name"], "name")
+    self.assert_equal("single_quote_test.tya", cases[0]["file"], "file")
+    self.assert_equal("9", cases[0]["line"], "line")
+    self.assert_equal(1.23, cases[0]["duration"], "duration")
+
+  test_junit_parse_testsuite_and_testsuites = ->
+    one = JUnit().parse_file("tests/fixtures/junit/run1.xml")
+    two = JUnit().parse_file("tests/fixtures/junit/run2.xml")
+    self.assert_equal(4, one.len(), "testsuite")
+    self.assert_equal(3, two.len(), "testsuites")
+    self.assert_equal("failed", one[1]["status"], "failure")
+    self.assert_equal("stack trace", one[1]["body"], "cdata")
+    self.assert_equal("stdout text", one[1]["system_out"], "stdout")
+    self.assert_equal("stderr text", one[1]["system_err"], "stderr")
+    self.assert_equal("skipped", one[2]["status"], "skipped")
+    self.assert_equal("error", two[2]["status"], "error")
