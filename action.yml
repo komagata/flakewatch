@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.12
+    default: v0.6.13
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -128,6 +128,37 @@ runs:
         flakewatch "${args[@]}"
         test -s "${{ inputs.output }}"
 
+    - name: Publish flakewatch report
+      id: publish-flakewatch-report
+      if: inputs.history-branch != ''
+      shell: bash
+      env:
+        HISTORY_DIR: ${{ steps.flakewatch-history.outputs.dir }}
+        HISTORY_BRANCH: ${{ inputs.history-branch }}
+      run: |
+        report_file="reports/${GITHUB_RUN_ID}/attempt-${GITHUB_RUN_ATTEMPT}/flakewatch.html"
+        mkdir -p "${HISTORY_DIR}/$(dirname "$report_file")"
+        cp "${{ inputs.output }}" "${HISTORY_DIR}/${report_file}"
+
+        cd "$HISTORY_DIR"
+        git add "$report_file"
+        git commit -m "Add flakewatch report for run ${GITHUB_RUN_ID}" || true
+
+        for attempt in 1 2 3; do
+          if git push origin "HEAD:${HISTORY_BRANCH}"; then
+            report_url="https://raw.githack.com/${GITHUB_REPOSITORY}/${HISTORY_BRANCH}/${report_file}"
+            echo "url=${report_url}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --depth=1 origin "${HISTORY_BRANCH}"
+          git rebase "origin/${HISTORY_BRANCH}"
+          sleep "$((attempt * 2))"
+        done
+
+        git push origin "HEAD:${HISTORY_BRANCH}"
+        report_url="https://raw.githack.com/${GITHUB_REPOSITORY}/${HISTORY_BRANCH}/${report_file}"
+        echo "url=${report_url}" >> "$GITHUB_OUTPUT"
+
     - name: Write flakewatch history
       if: inputs.history-branch != '' && (inputs.history-write == 'true' || (inputs.history-write == 'auto' && github.event_name != 'pull_request'))
       shell: bash
@@ -174,28 +205,28 @@ runs:
         if-no-files-found: error
 
     - name: Add flakewatch summary
-      if: inputs.add-job-summary == 'true' && inputs.upload-artifact == 'true'
+      if: inputs.add-job-summary == 'true' && (inputs.upload-artifact == 'true' || steps.publish-flakewatch-report.outputs.url != '')
       shell: bash
       env:
-        REPORT_URL: ${{ steps.upload-flakewatch-report.outputs.artifact-url }}
+        REPORT_URL: ${{ steps.publish-flakewatch-report.outputs.url || steps.upload-flakewatch-report.outputs.artifact-url }}
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
       run: |
         {
           echo "## Flakewatch"
           echo ""
-          echo "[Download ${ARTIFACT_NAME}](${REPORT_URL})"
+          echo "<a href=\"${REPORT_URL}\" target=\"_blank\" rel=\"noopener noreferrer\">Open ${ARTIFACT_NAME}</a>"
           echo ""
-          echo "Download the single HTML artifact and open it in your browser."
+          echo "Open the generated HTML report in a new browser tab."
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Update PR description with flakewatch report
-      if: github.event_name == 'pull_request' && inputs.update-pr-description == 'true' && inputs.upload-artifact == 'true'
+      if: github.event_name == 'pull_request' && inputs.update-pr-description == 'true' && (inputs.upload-artifact == 'true' || steps.publish-flakewatch-report.outputs.url != '')
       continue-on-error: true
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
-        REPORT_URL: ${{ steps.upload-flakewatch-report.outputs.artifact-url }}
+        REPORT_URL: ${{ steps.publish-flakewatch-report.outputs.url || steps.upload-flakewatch-report.outputs.artifact-url }}
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
       run: |
         node <<'NODE'
