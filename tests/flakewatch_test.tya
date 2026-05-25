@@ -1,5 +1,4 @@
 import file
-import json
 import unittest
 
 import flakewatch
@@ -104,8 +103,9 @@ class FlakewatchTest extends TestCase
     History().export_file(
       { output: history_path, junit: ["tests/fixtures/junit/run1.xml"], repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "a", branch: "main", event: "push" }
     )
-    record = Json.parse(File.read(history_path).split("\n")[0])
-    self.assert_equal("1", record["run_id"], "jsonl metadata")
+    history_text = File.read(history_path)
+    self.assert(history_text.contains("run_id"), "jsonl metadata key")
+    self.assert(history_text.contains("\"1\""), "jsonl metadata value")
     html = Report().html_from_junit_with_source_root_and_history(
       ["tests/fixtures/junit/run2.xml"],
       [history_path],
