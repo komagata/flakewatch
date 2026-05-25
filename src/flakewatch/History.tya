@@ -59,7 +59,7 @@ class History
       if pattern.contains("**/*.jsonl")
         base = pattern.split("**/*.jsonl")[0]
         if base.ends_with("/")
-          base = base.slice(0, base.byte_len() - 1)
+          base = self.slice(base, 0, base.byte_len() - 1)
         self.collect_jsonl(base, out)
       elseif File.exists?(pattern)
         out.push(pattern)
@@ -76,6 +76,14 @@ class History
         out.push(full)
       elseif not name.contains(".")
         self.collect_jsonl(full, out)
+
+  slice = text, start, finish ->
+    out = ""
+    i = start
+    while i < finish
+      out = out + text[i]
+      i = i + 1
+    return out
 
   sort_paths = paths ->
     return paths
