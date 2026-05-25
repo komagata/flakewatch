@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.9
+    default: v0.6.10
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -100,6 +100,13 @@ runs:
       env:
         HISTORY_PATTERN: ${{ steps.flakewatch-history.outputs.pattern }}
       run: |
+        if [[ "${{ inputs.junit }}" == *"**/*.xml" ]]; then
+          junit_root="${{ inputs.junit }}"
+          junit_root="${junit_root%%/**/*.xml}"
+          find "$junit_root" -name '*.xml' -type f -print0 |
+            xargs -0 -r perl -CS -i -pe 's/([^\x00-\x7F])/sprintf("&#x%04x;", ord($1))/ge'
+        fi
+
         if [ -n "${{ inputs['source-base-url'] }}" ]; then
           source_base_url="${{ inputs['source-base-url'] }}"
         else
