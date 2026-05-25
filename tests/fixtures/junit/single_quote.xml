@@ -1,0 +1,3 @@
+<testsuite name='pkg' timestamp='2026-05-25T00:00:00Z'>
+  <testcase classname='pkg.SingleQuoteTest' name='reads_single_quoted_attrs' time='1.23' file='single_quote_test.tya' line='9'/>
+</testsuite>

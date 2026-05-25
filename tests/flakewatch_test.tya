@@ -33,6 +33,17 @@ class FlakewatchTest extends TestCase
     self.assert_equal("skipped", one[2]["status"], "skipped")
     self.assert_equal("error", two[2]["status"], "error")
 
+  test_junit_parse_single_quoted_attributes = () ->
+    cases = JUnit().parse_file("tests/fixtures/junit/single_quote.xml")
+    self.assert_equal(1, cases.len(), "case count")
+    self.assert_equal("pkg", cases[0]["suite"], "suite")
+    self.assert_equal("2026-05-25T00:00:00Z", cases[0]["timestamp"], "timestamp")
+    self.assert_equal("pkg.SingleQuoteTest", cases[0]["classname"], "classname")
+    self.assert_equal("reads_single_quoted_attrs", cases[0]["name"], "name")
+    self.assert_equal("single_quote_test.tya", cases[0]["file"], "file")
+    self.assert_equal("9", cases[0]["line"], "line")
+    self.assert_equal(1.23, cases[0]["duration"], "duration")
+
   test_html_report_renders_flaky_and_slow_tests_without_database = () ->
     html = Report().html_from_junit(["tests/fixtures/junit/**/*.xml"])
     self.assert(html.contains("<h2>Flaky Tests</h2>"), "flaky section")
@@ -59,7 +70,7 @@ class FlakewatchTest extends TestCase
     self.assert(html.contains("pkg.HealedTest.recovers"), "healed test")
     self.assert(html.contains("10 passed"), "healed recent status")
     self.assert(html.contains("pkg.AlwaysFailTest.fails"), "slow test")
-    self.assert(html.contains("<strong>5</strong>slow tests"), "slow count")
+    self.assert(html.contains("<strong>6</strong>slow tests"), "slow count")
 
   test_html_report_ranks_tests_without_time_as_zero_seconds = () ->
     html = Report().html_from_junit(["tests/fixtures/junit/no_time.xml"])

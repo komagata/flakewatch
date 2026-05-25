@@ -1,5 +1,4 @@
 import os
-import cli as cli
 
 class Cli
   initialize = ->
@@ -97,13 +96,50 @@ class Cli
     return opt
 
   parse_options_or_exit = args, spec ->
-    result = cli.Cli.parse(args, spec)
-    if result["errors"].len() > 0
-      self.usage()
-      for err in result["errors"]
-        println(err["message"])
-      Os.exit(1)
+    options = self.default_options(spec)
+    i = 0
+    while i < args.len()
+      arg = args[i]
+      if arg.starts_with("--")
+        name = self.slice(arg, 2, arg.byte_len())
+        if options.has(name)
+          opt = spec["options"][name]
+          typ = opt["type"]
+          if typ == "bool"
+            options[name] = true
+          else
+            i = i + 1
+            if i < args.len()
+              value = args[i]
+              if typ == "int"
+                options[name] = value.to_i()
+              elseif typ == "array"
+                options[name].push(value)
+              else
+                options[name] = value
+      i = i + 1
+    result = { options: options, errors: [] }
     return result
+
+  default_options = spec ->
+    options = {}
+    for name in spec["options"].keys()
+      opt = spec["options"][name]
+      if opt.has("default")
+        options[name] = opt["default"]
+      elseif opt["type"] == "array"
+        options[name] = []
+      elseif opt["type"] == "bool"
+        options[name] = false
+    return options
+
+  slice = text, start, finish ->
+    out = ""
+    i = start
+    while i < finish
+      out = out + text[i]
+      i = i + 1
+    return out
 
   env_or = name, fallback ->
     value = Os.env(name)

@@ -330,7 +330,7 @@ class Report
 
   source_line = source_root, source_cache, source_line_cache, relative_path, line, test_name ->
     if line != ""
-      return line
+      return line.to_s()
     if relative_path == ""
       return ""
     source_path = relative_path
@@ -365,10 +365,18 @@ class Report
     candidates = []
     candidates.push("def " + test_name)
     if test_name.starts_with("test_")
-      name = test_name.slice(5, test_name.byte_len())
+      name = self.slice(test_name, 5, test_name.byte_len())
       candidates.push("test \"" + name + "\"")
       candidates.push("test '" + name + "'")
       words = name.replace("_", " ")
       candidates.push("test \"" + words + "\"")
       candidates.push("test '" + words + "'")
     return candidates
+
+  slice = text, start, finish ->
+    out = ""
+    i = start
+    while i < finish
+      out = out + text[i]
+      i = i + 1
+    return out

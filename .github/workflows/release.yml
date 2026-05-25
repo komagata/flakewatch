@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y libuv1-dev
+
+      - name: Install Tya
+        run: |
+          curl -L https://github.com/komagata/tya/releases/download/v0.66.0/tya-v0.66.0-linux-amd64.tar.gz | tar xz
+          cd tya-v0.66.0-linux-amd64
+          PREFIX="$RUNNER_TEMP/tya" ./install.sh
+          echo "$RUNNER_TEMP/tya/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: tya install
+
+      - name: Run tests
+        run: tya test tests
+
+      - name: Lint
+        run: tya lint src tests
+
+      - name: Build release asset
+        run: |
+          version="${GITHUB_REF_NAME}"
+          asset="flakewatch-${version}-linux-amd64.tar.gz"
+          mkdir -p tmp/release
+          tya build src/main.tya -o tmp/release/flakewatch
+          tar -C tmp/release -czf "tmp/release/${asset}" flakewatch
+          sha256sum "tmp/release/${asset}" > "tmp/release/${asset}.sha256"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME}"
+          asset="flakewatch-${version}-linux-amd64.tar.gz"
+          gh release create "${version}" \
+            "tmp/release/${asset}" \
+            "tmp/release/${asset}.sha256" \
+            --title "${version}" \
+            --notes "Flakewatch ${version}"

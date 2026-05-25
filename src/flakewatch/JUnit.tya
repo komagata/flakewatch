@@ -79,7 +79,7 @@ class JUnitPathFinder
       if pattern.contains("**/*.xml")
         base = pattern.split("**/*.xml")[0]
         if base.ends_with("/")
-          base = base.slice(0, base.byte_len() - 1)
+          base = self.slice(base, 0, base.byte_len() - 1)
         self.collect_xml(base, out)
       else
         out.push(pattern)
@@ -94,3 +94,11 @@ class JUnitPathFinder
         out.push(full)
       elseif not name.contains(".")
         self.collect_xml(full, out)
+
+  slice = text, start, finish ->
+    out = ""
+    i = start
+    while i < finish
+      out = out + text[i]
+      i = i + 1
+    return out
