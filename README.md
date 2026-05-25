@@ -59,7 +59,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.10
+  uses: komagata/flakewatch@v0.6.11
   with:
     junit: "test-results/**/*.xml"
 ```
@@ -67,7 +67,7 @@ permissions:
 By default, the action:
 
 - generates `flakewatch.html`
-- uploads it as a single-file artifact, not a zip archive
+- uploads it as an artifact containing `flakewatch.html`
 - adds a download link to the job summary
 - adds or updates a `Flakewatch Report` block with a linked banner image in the
   pull request description
@@ -91,7 +91,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.10
+  uses: komagata/flakewatch@v0.6.11
   with:
     junit: "test-results/**/*.xml"
     history-branch: flakewatch-data
@@ -118,7 +118,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.10
+  uses: komagata/flakewatch@v0.6.11
   with:
     junit: "test-results/**/*.xml"
     history-branch: flakewatch-data
@@ -137,7 +137,7 @@ visible in the job log.
 | `output` | `flakewatch.html` | HTML report output path. |
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
-| `version` | `v0.6.10` | Flakewatch release version to install. |
+| `version` | `v0.6.11` | Flakewatch release version to install. |
 | `upload-artifact` | `true` | Upload the generated HTML report as a GitHub Actions artifact. |
 | `artifact-name` | `flakewatch.html` | GitHub Actions artifact name for the generated HTML report. |
 | `update-pr-description` | `true` | Add or update a Flakewatch report link in the pull request description. |
