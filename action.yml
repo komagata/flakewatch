@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.7
+    default: v0.6.8
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -89,6 +89,9 @@ runs:
         fi
 
         mkdir -p history
+        find history -name '*.jsonl' -type f | sort | awk '{ files[NR] = $0 } END { for (i = 1; i <= NR - 1; i++) print files[i] }' | xargs -r rm -f
+        find history -name '*.jsonl' -type f -print0 |
+          xargs -0 -r perl -CS -i -pe 's/&/\\u0026/g; s/([^\x00-\x7F])/sprintf("\\u%04x", ord($1))/ge'
         echo "dir=${history_dir}" >> "$GITHUB_OUTPUT"
         echo "pattern=${history_dir}/history/**/*.jsonl" >> "$GITHUB_OUTPUT"
 

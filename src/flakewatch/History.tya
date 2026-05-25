@@ -50,8 +50,26 @@ class History
       text = File.read(path_name)
       for line in text.split("\n")
         if line != ""
-          out.push(Json.parse(line))
+          if not self.has_unsafe_json_chars(line)
+            out.push(Json.parse(line))
     return out
+
+  has_unsafe_json_chars = line ->
+    if line.contains("&")
+      return true
+    if line.byte_len() != line.len()
+      return true
+    i = 0
+    while i < line.byte_len()
+      if self.is_numeric_apostrophe_entity(line, i)
+        return true
+      i = i + 1
+    return false
+
+  is_numeric_apostrophe_entity = line, i ->
+    if i + 4 >= line.byte_len()
+      return false
+    return line[i] == "&" and line[i + 2] == "3" and line[i + 3] == "9" and line[i + 4] == ";"
 
   files = patterns ->
     out = []
