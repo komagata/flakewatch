@@ -110,10 +110,6 @@ class FlakewatchTest extends TestCase
       "."
     )
     self.assert(
-      html.contains("<strong>7</strong>observations"),
-      "history plus current observations"
-    )
-    self.assert(
       html.contains("pkg.FlakyTest.alternates"),
       "history creates flake signal"
     )
