@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.15
+    default: v0.6.16
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -30,6 +30,22 @@ inputs:
     description: GitHub Actions artifact name for the generated HTML report.
     required: false
     default: flakewatch.html
+  download-artifacts:
+    description: Download JUnit XML artifacts before generating the report. Enable this in a fan-in job after matrix test jobs upload their XML.
+    required: false
+    default: "false"
+  download-artifact-pattern:
+    description: Artifact name pattern to download when download-artifacts is true, for example junit-*.
+    required: false
+    default: ""
+  download-artifact-path:
+    description: Destination directory for downloaded JUnit XML artifacts.
+    required: false
+    default: test-results
+  merge-artifacts:
+    description: Merge downloaded artifacts into download-artifact-path.
+    required: false
+    default: "true"
   update-pr-description:
     description: Add or update a Flakewatch report link in the pull request description.
     required: false
@@ -94,6 +110,21 @@ runs:
           xargs -0 -r perl -CS -i -pe 's/&/\\u0026/g; s/([^\x00-\x7F])/sprintf("\\u%04x", ord($1))/ge'
         echo "dir=${history_dir}" >> "$GITHUB_OUTPUT"
         echo "pattern=${history_dir}/history/**/*.jsonl" >> "$GITHUB_OUTPUT"
+
+    - name: Download JUnit artifacts by pattern
+      if: inputs.download-artifacts == 'true' && inputs.download-artifact-pattern != ''
+      uses: actions/download-artifact@v7
+      with:
+        pattern: ${{ inputs.download-artifact-pattern }}
+        path: ${{ inputs.download-artifact-path }}
+        merge-multiple: ${{ inputs.merge-artifacts }}
+
+    - name: Download all JUnit artifacts
+      if: inputs.download-artifacts == 'true' && inputs.download-artifact-pattern == ''
+      uses: actions/download-artifact@v7
+      with:
+        path: ${{ inputs.download-artifact-path }}
+        merge-multiple: ${{ inputs.merge-artifacts }}
 
     - name: Generate flakewatch report
       shell: bash

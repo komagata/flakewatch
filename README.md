@@ -59,7 +59,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.15
+  uses: komagata/flakewatch@v0.6.16
   with:
     junit: "test-results/**/*.xml"
 ```
@@ -78,6 +78,54 @@ CI job green and the job summary still links to the artifact.
 
 See `examples/github-actions.yml` for a complete workflow shape.
 
+### Matrix Test Jobs
+
+When tests run in a matrix, upload JUnit XML from each test job and run
+Flakewatch once in a final fan-in job:
+
+```yaml
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          bundle exec rails test \
+            --junit \
+            --junit-filename "test-results/junit-${{ matrix.shard }}.xml"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: junit-${{ matrix.shard }}
+          path: test-results/**/*.xml
+
+  flakewatch:
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: komagata/flakewatch@v0.6.16
+        with:
+          download-artifacts: true
+          download-artifact-pattern: junit-*
+          junit: "test-results/**/*.xml"
+```
+
+Flakewatch reads all downloaded XML files in stable path order. If JUnit XML
+contains `testsuite timestamp` values, the report uses timestamp plus path order
+for observation ordering.
+
 ### Persistent History
 
 By default, Flakewatch analyzes only the JUnit XML files from the current
@@ -91,7 +139,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.15
+  uses: komagata/flakewatch@v0.6.16
   with:
     junit: "test-results/**/*.xml"
     history-branch: flakewatch-data
@@ -118,7 +166,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.15
+  uses: komagata/flakewatch@v0.6.16
   with:
     junit: "test-results/**/*.xml"
     history-branch: flakewatch-data
@@ -137,9 +185,13 @@ visible in the job log.
 | `output` | `flakewatch.html` | HTML report output path. |
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
-| `version` | `v0.6.15` | Flakewatch release version to install. |
+| `version` | `v0.6.16` | Flakewatch release version to install. |
 | `upload-artifact` | `true` | Upload the generated HTML report as a GitHub Actions artifact. |
 | `artifact-name` | `flakewatch.html` | GitHub Actions artifact name for the generated HTML report. |
+| `download-artifacts` | `false` | Download JUnit XML artifacts before generating the report. Use this in a fan-in job after matrix test jobs upload XML artifacts. |
+| `download-artifact-pattern` | empty | Artifact name pattern to download, for example `junit-*`. When empty, all artifacts are downloaded. |
+| `download-artifact-path` | `test-results` | Destination directory for downloaded JUnit XML artifacts. |
+| `merge-artifacts` | `true` | Merge downloaded artifacts into `download-artifact-path`. |
 | `update-pr-description` | `true` | Add or update a Flakewatch report link in the pull request description. |
 | `add-job-summary` | `true` | Add a Flakewatch report link to the GitHub Actions job summary. |
 | `history-branch` | empty | Git branch used to persist JSONL test history. |

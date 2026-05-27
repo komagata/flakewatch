@@ -27,6 +27,44 @@ jobs:
 
       - name: Generate flakewatch report
         if: always()
-        uses: komagata/flakewatch@v0.6.6
+        uses: komagata/flakewatch@v0.6.16
         with:
+          junit: "test-results/**/*.xml"
+
+  matrix-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Run one test shard here and write JUnit XML under test-results/.
+      - name: Run test shard
+        run: |
+          bundle exec rails test \
+            --junit \
+            --junit-filename "test-results/junit-${{ matrix.shard }}.xml"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: junit-${{ matrix.shard }}
+          path: test-results/**/*.xml
+
+  flakewatch-matrix:
+    needs: matrix-test
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate flakewatch report
+        uses: komagata/flakewatch@v0.6.16
+        with:
+          download-artifacts: true
+          download-artifact-pattern: junit-*
           junit: "test-results/**/*.xml"

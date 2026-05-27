@@ -7,12 +7,63 @@ class History
   initialize = ->
     self.junit = JUnit()
 
+  collect_jsonl = root, out ->
+    if root == ""
+      root = "."
+    if not File.exists?(root)
+      return nil
+    for name in Dir.list(root)
+      full = Path.join([root, name])
+      if name.ends_with(".jsonl")
+        out.push(full)
+      elseif not name.contains(".")
+        self.collect_jsonl(full, out)
+
   export_file = opts ->
     lines = []
     for item in self.items_from_junit(opts)
       lines.push(Json.dump(item))
     File.write(opts["output"], lines.join("\n") + "\n")
     println("wrote " + opts["output"])
+
+  files = patterns ->
+    out = []
+    for pattern in patterns
+      if pattern.contains("**/*.jsonl")
+        base = pattern.split("**/*.jsonl")[0]
+        if base.ends_with("/")
+          base = self.slice(base, 0, base.byte_len() - 1)
+        self.collect_jsonl(base, out)
+      elseif File.exists?(pattern)
+        out.push(pattern)
+    return self.sort_strings(out)
+
+  has_unsafe_json_chars = line ->
+    if line.contains("&")
+      return true
+    if line.byte_len() != line.len()
+      return true
+    i = 0
+    while i < line.byte_len()
+      if self.is_numeric_apostrophe_entity(line, i)
+        return true
+      i = i + 1
+    return false
+
+  is_numeric_apostrophe_entity = line, i ->
+    if i + 4 >= line.byte_len()
+      return false
+    return line[i] == "&" and line[i + 2] == "3" and line[i + 3] == "9" and line[i + 4] == ";"
+
+  items_from_jsonl = patterns ->
+    out = []
+    for path_name in self.files(patterns)
+      text = File.read(path_name)
+      for line in text.split("\n")
+        if line != ""
+          if not self.has_unsafe_json_chars(line)
+            out.push(Json.parse(line))
+    return out
 
   items_from_junit = opts ->
     out = []
@@ -44,57 +95,6 @@ class History
       message: item["message"]
     return out
 
-  items_from_jsonl = patterns ->
-    out = []
-    for path_name in self.files(patterns)
-      text = File.read(path_name)
-      for line in text.split("\n")
-        if line != ""
-          if not self.has_unsafe_json_chars(line)
-            out.push(Json.parse(line))
-    return out
-
-  has_unsafe_json_chars = line ->
-    if line.contains("&")
-      return true
-    if line.byte_len() != line.len()
-      return true
-    i = 0
-    while i < line.byte_len()
-      if self.is_numeric_apostrophe_entity(line, i)
-        return true
-      i = i + 1
-    return false
-
-  is_numeric_apostrophe_entity = line, i ->
-    if i + 4 >= line.byte_len()
-      return false
-    return line[i] == "&" and line[i + 2] == "3" and line[i + 3] == "9" and line[i + 4] == ";"
-
-  files = patterns ->
-    out = []
-    for pattern in patterns
-      if pattern.contains("**/*.jsonl")
-        base = pattern.split("**/*.jsonl")[0]
-        if base.ends_with("/")
-          base = self.slice(base, 0, base.byte_len() - 1)
-        self.collect_jsonl(base, out)
-      elseif File.exists?(pattern)
-        out.push(pattern)
-    return out
-
-  collect_jsonl = root, out ->
-    if root == ""
-      root = "."
-    if not File.exists?(root)
-      return nil
-    for name in Dir.list(root)
-      full = Path.join([root, name])
-      if name.ends_with(".jsonl")
-        out.push(full)
-      elseif not name.contains(".")
-        self.collect_jsonl(full, out)
-
   slice = text, start, finish ->
     out = ""
     i = start
@@ -105,3 +105,22 @@ class History
 
   sort_paths = paths ->
     return paths
+
+  sort_strings = items ->
+    out = []
+    used = {}
+    while out.len() < items.len()
+      best = ""
+      best_index = -1
+      i = 0
+      while i < items.len()
+        if used[i.to_s()] == nil
+          if best_index == -1 or items[i] < best
+            best = items[i]
+            best_index = i
+        i = i + 1
+      if best_index == -1
+        return out
+      used[best_index.to_s()] = "true"
+      out.push(best)
+    return out

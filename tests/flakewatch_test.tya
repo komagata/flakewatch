@@ -96,6 +96,22 @@ class FlakewatchTest extends TestCase
       "history creates flake signal"
     )
 
+  test_junit_files_are_sorted_for_stable_matrix_reports = ->
+    files = JUnit().files(
+      ["tests/fixtures/junit/run2.xml", "tests/fixtures/junit/run1.xml"]
+    )
+    self.assert_equal("tests/fixtures/junit/run1.xml", files[0], "first file")
+    self.assert_equal("tests/fixtures/junit/run2.xml", files[1], "second file")
+    rows = Report().junit_rows(
+      ["tests/fixtures/junit/run2.xml", "tests/fixtures/junit/run1.xml"]
+    )
+    found = false
+    for row in rows
+      if row["name"] == "pkg.FlakyTest.alternates"
+        found = true
+        self.assert_equal("failed", row["last_status"], "last status")
+    self.assert(found, "flaky row")
+
   test_junit_parse_single_quoted_attributes = ->
     cases = JUnit().parse_file("tests/fixtures/junit/single_quote.xml")
     self.assert_equal(1, cases.len(), "case count")
