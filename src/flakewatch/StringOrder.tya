@@ -1,9 +1,6 @@
 class StringOrder
   less = left, right ->
-    alphabet = """
-      
-       !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~
-      """
+    alphabet = " -./0123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
     i = 0
     while i < left.byte_len() and i < right.byte_len()
       left_rank = self.rank(alphabet, left[i])
