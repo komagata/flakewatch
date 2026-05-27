@@ -109,13 +109,14 @@ class History
   sort_strings = items ->
     out = []
     used = {}
+    order = StringOrder()
     while out.len() < items.len()
       best = ""
       best_index = -1
       i = 0
       while i < items.len()
         if used[i.to_s()] == nil
-          if best_index == -1 or items[i] < best
+          if best_index == -1 or order.less(items[i], best)
             best = items[i]
             best_index = i
         i = i + 1

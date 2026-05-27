@@ -424,13 +424,14 @@ class Report
   top_sources = sources ->
     out = []
     used = {}
+    order = StringOrder()
     while out.len() < sources.len()
       best = nil
       best_index = -1
       i = 0
       while i < sources.len()
         if used[i.to_s()] == nil
-          if best == nil or sources[i]["key"] < best["key"]
+          if best == nil or order.less(sources[i]["key"], best["key"])
             best = sources[i]
             best_index = i
         i = i + 1
