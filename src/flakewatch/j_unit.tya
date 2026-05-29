@@ -1,14 +1,15 @@
 import dir
 import file
 import path
-
-import xml
+import xml/* as xml
 
 class JUnit
-  initialize = ->
+  path_finder: nil
+
+  initialize: ->
     self.path_finder = JUnitPathFinder()
 
-  case_from = suite_name, suite_timestamp, item ->
+  case_from: suite_name, suite_timestamp, item ->
     status = "passed"
     message = ""
     body = ""
@@ -48,77 +49,55 @@ class JUnit
       body: body
       system_out: stdout
       system_err: stderr
-    return out
+    out
 
-  files = patterns ->
-    return self.path_finder.files(patterns)
+  files: patterns -> path_finder.files(patterns)
 
-  parse = text ->
+  parse: text ->
     cases = []
-    root = Xml.parse(text).root()
+    root = xml.Xml.parse(text).root()
     if root.name == "testsuite"
-      self.parse_suite(root, cases)
+      parse_suite(root, cases)
     else
       for child_suite in root.find_all("testsuite")
-        self.parse_suite(child_suite, cases)
-    return cases
+        parse_suite(child_suite, cases)
+    cases
 
-  parse_file = path_name ->
-    return self.parse(File.read(path_name))
+  parse_file: path_name -> parse(file.File.read(path_name))
 
-  parse_suite = suite, cases ->
+  parse_suite: suite, cases ->
     suite_name = suite.attr("name", "")
     suite_timestamp = suite.attr("timestamp", "")
     for item in suite.find_all("testcase")
-      cases.push(self.case_from(suite_name, suite_timestamp, item))
+      cases.push(case_from(suite_name, suite_timestamp, item))
 
 class JUnitPathFinder
-  collect_xml = root, out ->
+  collect_xml: root, out ->
     if root == ""
       root = "."
-    for name in Dir.list(root)
-      full = Path.join([root, name])
+    for name in dir.Dir.list(root)
+      full = path.Path().join([root, name])
       if name.ends_with(".xml")
         out.push(full)
       elseif not name.contains(".")
-        self.collect_xml(full, out)
+        collect_xml(full, out)
 
-  files = patterns ->
+  files: patterns ->
     out = []
     for pattern in patterns
       if pattern.contains("**/*.xml")
         base = pattern.split("**/*.xml")[0]
         if base.ends_with("/")
-          base = self.slice(base, 0, base.byte_len() - 1)
-        self.collect_xml(base, out)
+          base = slice(base, 0, base.byte_len() - 1)
+        collect_xml(base, out)
       else
         out.push(pattern)
-    return self.sort_strings(out)
+    out.sort()
 
-  slice = text, start, finish ->
+  slice: text, start, finish ->
     out = ""
     i = start
     while i < finish
       out = out + text[i]
       i = i + 1
-    return out
-
-  sort_strings = items ->
-    out = []
-    used = {}
-    order = StringOrder()
-    while out.len() < items.len()
-      best = ""
-      best_index = -1
-      i = 0
-      while i < items.len()
-        if used[i.to_s()] == nil
-          if best_index == -1 or order.less(items[i], best)
-            best = items[i]
-            best_index = i
-        i = i + 1
-      if best_index == -1
-        return out
-      used[best_index.to_s()] = "true"
-      out.push(best)
-    return out
+    out

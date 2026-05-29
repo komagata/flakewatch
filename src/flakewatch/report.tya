@@ -1,22 +1,30 @@
 import file
 
 class Report
-  initialize = ->
+  history: nil
+
+  junit: nil
+
+  initialize: ->
     self.junit = JUnit()
     self.history = History()
 
-  combined_items = history_patterns, junit_patterns ->
+  combined_items: history_patterns, junit_patterns ->
     out = []
-    for item in self.history_items(history_patterns)
+    for item in history_items(history_patterns)
       out.push(item)
-    for item in self.junit_items(junit_patterns)
+    for item in junit_items(junit_patterns)
       out.push(item)
-    return out
+    out
 
-  escape = text ->
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+  escape: text ->
+    text
+      .replace("&", "&amp;")
+      .replace("<", "&lt;")
+      .replace(">", "&gt;")
+      .replace("\"", "&quot;")
 
-  failing_table = rows, source_base_url, source_root, source_cache, source_line_cache ->
+  failing_table: rows, source_base_url, source_root, source_cache, source_line_cache ->
     out = "<table><thead><tr><th class=\"test-col\" data-sort=\"text\">Test</th><th class=\"num\" data-sort=\"number\">Failures</th><th class=\"num\" data-sort=\"number\">Fail</th><th class=\"num\" data-sort=\"number\">Error</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"status\" data-sort=\"text\">Last</th></tr></thead><tbody>"
     count = 0
     for row in rows
@@ -24,7 +32,7 @@ class Report
         count = count + 1
         out = out
           + "<tr><td>"
-          + self.test_link(row, source_base_url, source_root, source_cache, source_line_cache)
+          + test_link(row, source_base_url, source_root, source_cache, source_line_cache)
           + "</td><td class=\"num\">"
           + row["failure_count"].to_s()
           + "</td><td class=\"num\">"
@@ -34,13 +42,13 @@ class Report
           + "</td><td class=\"num\">"
           + row["observations"].to_s()
           + "</td><td class=\"status\">"
-          + self.escape(row["last_status"])
+          + escape(row["last_status"])
           + "</td></tr>"
     if count == 0
       return "<div class=\"empty\">No failing tests found in these JUnit files.</div>"
-    return out + "</tbody></table>"
+    out + "</tbody></table>"
 
-  flaky_table = rows, source_base_url, source_root, source_cache, source_line_cache ->
+  flaky_table: rows, source_base_url, source_root, source_cache, source_line_cache ->
     out = "<table><thead><tr><th class=\"test-col\" data-sort=\"text\">Test</th><th class=\"num\" data-sort=\"number\">Score</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"num\" data-sort=\"number\">Pass</th><th class=\"num\" data-sort=\"number\">Fail</th><th class=\"num\" data-sort=\"number\">Error</th><th class=\"num\" data-sort=\"number\">Transitions</th><th class=\"status\" data-sort=\"text\">Last</th></tr></thead><tbody>"
     count = 0
     for row in rows
@@ -48,7 +56,7 @@ class Report
         count = count + 1
         out = out
           + "<tr><td>"
-          + self.test_link(row, source_base_url, source_root, source_cache, source_line_cache)
+          + test_link(row, source_base_url, source_root, source_cache, source_line_cache)
           + "</td><td class=\"num\">"
           + row["flake_score"].to_s()
           + "</td><td class=\"num\">"
@@ -62,13 +70,13 @@ class Report
           + "</td><td class=\"num\">"
           + row["transition_count"].to_s()
           + "</td><td class=\"status\">"
-          + self.escape(row["last_status"])
+          + escape(row["last_status"])
           + "</td></tr>"
     if count == 0
       return "<div class=\"empty\">No flaky tests detected in these JUnit files.</div>"
-    return out + "</tbody></table>"
+    out + "</tbody></table>"
 
-  healed_table = rows, source_base_url, source_root, source_cache, source_line_cache ->
+  healed_table: rows, source_base_url, source_root, source_cache, source_line_cache ->
     out = "<table><thead><tr><th class=\"test-col\" data-sort=\"text\">Test</th><th class=\"num\" data-sort=\"number\">Score</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"num\" data-sort=\"number\">Pass</th><th class=\"num\" data-sort=\"number\">Fail</th><th class=\"num\" data-sort=\"number\">Error</th><th class=\"status\" data-sort=\"text\">Recent</th></tr></thead><tbody>"
     count = 0
     for row in rows
@@ -76,7 +84,7 @@ class Report
         count = count + 1
         out = out
           + "<tr><td>"
-          + self.test_link(row, source_base_url, source_root, source_cache, source_line_cache)
+          + test_link(row, source_base_url, source_root, source_cache, source_line_cache)
           + "</td><td class=\"num\">"
           + row["healed_score"].to_s()
           + "</td><td class=\"num\">"
@@ -90,14 +98,14 @@ class Report
           + "</td><td class=\"status\">10 passed</td></tr>"
     if count == 0
       return "<div class=\"empty\">No healed candidates detected. A test must have past pass/fail variation and 10 most recent passing observations.</div>"
-    return out + "</tbody></table>"
+    out + "</tbody></table>"
 
-  history_items = patterns ->
+  history_items: patterns ->
     if patterns.len() == 0
       return []
-    return self.history.items_from_jsonl(patterns)
+    history.items_from_jsonl(patterns)
 
-  html = rows, source_base_url, source_root ->
+  html: rows, source_base_url, source_root ->
     source_cache = {}
     source_line_cache = {}
     data = self.template_data(
@@ -107,43 +115,46 @@ class Report
       source_cache,
       source_line_cache
     )
-    return self.render_page(data)
+    render_page(data)
 
-  html_from_junit = patterns ->
-    return self.html_from_junit_with_source(patterns, "")
+  html_from_junit: patterns -> html_from_junit_with_source(patterns, "")
 
-  html_from_junit_with_source = patterns, source_base_url ->
-    return self.html_from_junit_with_source_root(patterns, source_base_url, ".")
+  html_from_junit_with_source: patterns, source_base_url ->
+    html_from_junit_with_source_root(patterns, source_base_url, ".")
 
-  html_from_junit_with_source_root = patterns, source_base_url, source_root ->
-    return self.html_from_junit_with_source_root_and_history(patterns, [], source_base_url, source_root)
+  html_from_junit_with_source_root: patterns, source_base_url, source_root ->
+    html_from_junit_with_source_root_and_history(
+      patterns,
+      [],
+      source_base_url,
+      source_root
+    )
 
-  html_from_junit_with_source_root_and_history = patterns, history_patterns, source_base_url, source_root ->
-    rows = self.rows_from_items(self.combined_items(history_patterns, patterns))
-    return self.html(rows, source_base_url, source_root)
+  html_from_junit_with_source_root_and_history: patterns, history_patterns, source_base_url, source_root ->
+    rows = rows_from_items(combined_items(history_patterns, patterns))
+    html(rows, source_base_url, source_root)
 
-  junit_items = patterns ->
+  junit_items: patterns ->
     items = []
-    for source in self.junit_sources(patterns)
+    for source in junit_sources(patterns)
       for item in source["items"]
         items.push(item)
-    return items
+    items
 
-  junit_rows = patterns ->
-    return self.rows_from_items(self.junit_items(patterns))
+  junit_rows: patterns -> rows_from_items(junit_items(patterns))
 
-  junit_sources = patterns ->
+  junit_sources: patterns ->
     sources = []
-    for path_name in self.junit.files(patterns)
-      items = self.junit.parse_file(path_name)
+    for path_name in junit.files(patterns)
+      items = junit.parse_file(path_name)
       key = path_name
       if items.len() > 0 and items[0]["timestamp"] != ""
         key = items[0]["timestamp"] + " " + path_name
       source = { path: path_name, key: key, items: items }
       sources.push(source)
-    return self.top_sources(sources)
+    top_sources(sources)
 
-  recent_all_passed = statuses, limit ->
+  recent_all_passed: statuses, limit ->
     if statuses.len() < limit
       return false
     i = statuses.len() - limit
@@ -151,19 +162,19 @@ class Report
       if statuses[i] != "true"
         return false
       i = i + 1
-    return true
+    true
 
-  render_html_file = opts ->
+  render_html_file: opts ->
     html = self.html_from_junit_with_source_root_and_history(
       opts["junit"],
       opts["history"],
       opts["source_base_url"],
       opts["source_root"]
     )
-    File.write(opts["output"], html)
+    file.File.write(opts["output"], html)
     println("wrote " + opts["output"])
 
-  render_page = data ->
+  render_page: data ->
     out = "<!doctype html>\n"
       + "<html>\n"
       + "<head>\n"
@@ -197,19 +208,19 @@ class Report
     for metric in data["metrics"]
       out = out
         + "<div class=\"metric\"><strong>"
-        + self.escape(metric["value"])
+        + escape(metric["value"])
         + "</strong>"
-        + self.escape(metric["label"])
+        + escape(metric["label"])
         + "</div>\n"
     out = out + "</div>\n"
     for section in data["sections"]
-      out = out + "<h2>" + self.escape(section["title"]) + "</h2>\n"
+      out = out + "<h2>" + escape(section["title"]) + "</h2>\n"
       out = out + section["body"] + "\n"
     out = out + data["sort_script"] + "\n"
     out = out + "</body>\n</html>\n"
-    return out
+    out
 
-  rows_from_items = items ->
+  rows_from_items: items ->
     by_test = {}
     for item in items
       class_name = item["classname"].to_s()
@@ -257,12 +268,11 @@ class Report
       elseif status == "failed"
         row["fail_count"] = row["fail_count"] + 1
         row["failure_count"] = row["failure_count"] + 1
-      else
-        if status == "error"
-          row["error_count"] = row["error_count"] + 1
-          row["failure_count"] = row["failure_count"] + 1
-        elseif status == "skipped"
-          row["skipped_count"] = row["skipped_count"] + 1
+      elseif status == "error"
+        row["error_count"] = row["error_count"] + 1
+        row["failure_count"] = row["failure_count"] + 1
+      elseif status == "skipped"
+        row["skipped_count"] = row["skipped_count"] + 1
       row["total_duration"] = row["total_duration"] + item["duration"]
       if item["duration"] > row["max_duration"]
         row["max_duration"] = item["duration"]
@@ -276,37 +286,35 @@ class Report
       if row["pass_count"] > 0 and non_pass > 0
         row["flake_score"] = 50 + row["transition_count"] * 10 + non_pass * 5
       row["healed_score"] = 0
-      if (
-        row["flake_score"] > 0 and self.recent_all_passed(row["recent_passish"], 10)
-      )
+      if row["flake_score"] > 0 and recent_all_passed(row["recent_passish"], 10)
         row["healed_score"] = row["flake_score"]
         row["flake_score"] = 0
       rows.push(row)
-    return rows
+    rows
 
-  slice = text, start, finish ->
+  slice: text, start, finish ->
     out = ""
     i = start
     while i < finish
       out = out + text[i]
       i = i + 1
-    return out
+    out
 
-  slow_count = rows ->
+  slow_count: rows ->
     count = 0
     for row in rows
       if row["max_duration"] > 0
         count = count + 1
-    return count
+    count
 
-  slow_table = rows, source_base_url, source_root, source_cache, source_line_cache ->
+  slow_table: rows, source_base_url, source_root, source_cache, source_line_cache ->
     out = "<table><thead><tr><th class=\"test-col\" data-sort=\"text\">Test</th><th class=\"num\" data-sort=\"number\">Max seconds</th><th class=\"num\" data-sort=\"number\">Avg seconds</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"status\" data-sort=\"text\">Last</th></tr></thead><tbody>"
     count = 0
     for row in rows
       count = count + 1
       out = out
         + "<tr><td>"
-        + self.test_link(row, source_base_url, source_root, source_cache, source_line_cache)
+        + test_link(row, source_base_url, source_root, source_cache, source_line_cache)
         + "</td><td class=\"num\">"
         + row["max_duration"].to_s()
         + "</td><td class=\"num\">"
@@ -314,16 +322,16 @@ class Report
         + "</td><td class=\"num\">"
         + row["observations"].to_s()
         + "</td><td class=\"status\">"
-        + self.escape(row["last_status"])
+        + escape(row["last_status"])
         + "</td></tr>"
     if count == 0
       return "<div class=\"empty\">No tests found in these JUnit files.</div>"
-    return out + "</tbody></table>"
+    out + "</tbody></table>"
 
-  sort_script = ->
-    return "<script>(function(){{function value(row,index,type){{var text=row.children[index].textContent.trim();if(type==='number'){{var number=parseFloat(text);return isNaN(number)?0:number;}}return text.toLowerCase();}}document.querySelectorAll('th[data-sort]').forEach(function(th){{th.addEventListener('click',function(){{var table=th.closest('table');var tbody=table.querySelector('tbody');var headers=Array.prototype.slice.call(th.parentNode.children);var index=headers.indexOf(th);var type=th.getAttribute('data-sort');var direction=th.classList.contains('sort-desc')?'asc':'desc';headers.forEach(function(item){{item.classList.remove('sort-asc','sort-desc');}});th.classList.add(direction==='asc'?'sort-asc':'sort-desc');Array.prototype.slice.call(tbody.querySelectorAll('tr')).sort(function(a,b){{var av=value(a,index,type);var bv=value(b,index,type);if(av<bv){{return direction==='asc'?-1:1;}}if(av>bv){{return direction==='asc'?1:-1;}}return 0;}}).forEach(function(row){{tbody.appendChild(row);}});}});}});}})();</script>"
+  sort_script: ->
+    "<script>(function(){{function value(row,index,type){{var text=row.children[index].textContent.trim();if(type==='number'){{var number=parseFloat(text);return isNaN(number)?0:number;}}return text.toLowerCase();}}document.querySelectorAll('th[data-sort]').forEach(function(th){{th.addEventListener('click',function(){{var table=th.closest('table');var tbody=table.querySelector('tbody');var headers=Array.prototype.slice.call(th.parentNode.children);var index=headers.indexOf(th);var type=th.getAttribute('data-sort');var direction=th.classList.contains('sort-desc')?'asc':'desc';headers.forEach(function(item){{item.classList.remove('sort-asc','sort-desc');}});th.classList.add(direction==='asc'?'sort-asc':'sort-desc');Array.prototype.slice.call(tbody.querySelectorAll('tr')).sort(function(a,b){{var av=value(a,index,type);var bv=value(b,index,type);if(av<bv){{return direction==='asc'?-1:1;}}if(av>bv){{return direction==='asc'?1:-1;}}return 0;}}).forEach(function(row){{tbody.appendChild(row);}});}});}});}})();</script>"
 
-  source_line = source_root, source_cache, source_line_cache, relative_path, line, test_name ->
+  source_line: source_root, source_cache, source_line_cache, relative_path, line, test_name ->
     if line != ""
       return line.to_s()
     if relative_path == ""
@@ -335,15 +343,15 @@ class Report
     if source_line_cache[cache_key] != nil
       return source_line_cache[cache_key]
     if source_cache[source_path] == nil
-      if File.exists?(source_path)
-        source_cache[source_path] = File.read(source_path).split("\n")
+      if file.File.exists?(source_path)
+        source_cache[source_path] = file.File.read(source_path).split("\n")
       else
         source_cache[source_path] = []
     lines = source_cache[source_path]
     if lines.len() == 0
       source_line_cache[cache_key] = ""
       return ""
-    candidates = self.test_line_candidates(test_name)
+    candidates = test_line_candidates(test_name)
     i = 0
     while i < lines.len()
       for candidate in candidates
@@ -354,9 +362,9 @@ class Report
           return found
       i = i + 1
     source_line_cache[cache_key] = ""
-    return ""
+    ""
 
-  template_data = rows, source_base_url, source_root, source_cache, source_line_cache ->
+  template_data: rows, source_base_url, source_root, source_cache, source_line_cache ->
     source_cache = {}
     source_line_cache = {}
     total = 0
@@ -366,27 +374,27 @@ class Report
       total = total + 1
       observations = observations + row["observations"]
       failures = failures + row["fail_count"] + row["error_count"]
-    slow_tests = self.slow_count(rows)
+    slow_tests = slow_count(rows)
     data =
       metrics: [{ value: total.to_s(), label: "tests" }, { value: observations.to_s(), label: "observations" }, { value: failures.to_s(), label: "failures/errors" }, { value: slow_tests.to_s(), label: "slow tests" }]
-      sections: [{ title: "Flaky Tests", body: self.flaky_table(self.top_rows(rows, "flake_score", 20), source_base_url, source_root, source_cache, source_line_cache) }, { title: "Healed Candidates", body: self.healed_table(self.top_rows(rows, "healed_score", 20), source_base_url, source_root, source_cache, source_line_cache) }, { title: "Failing Tests", body: self.failing_table(self.top_rows(rows, "failure_count", 20), source_base_url, source_root, source_cache, source_line_cache) }, { title: "Slow Tests", body: self.slow_table(self.top_rows(rows, "max_duration", 20), source_base_url, source_root, source_cache, source_line_cache) }]
-      sort_script: self.sort_script()
-    return data
+      sections: [{ title: "Flaky Tests", body: flaky_table(top_rows(rows, "flake_score", 20), source_base_url, source_root, source_cache, source_line_cache) }, { title: "Healed Candidates", body: healed_table(top_rows(rows, "healed_score", 20), source_base_url, source_root, source_cache, source_line_cache) }, { title: "Failing Tests", body: failing_table(top_rows(rows, "failure_count", 20), source_base_url, source_root, source_cache, source_line_cache) }, { title: "Slow Tests", body: slow_table(top_rows(rows, "max_duration", 20), source_base_url, source_root, source_cache, source_line_cache) }]
+      sort_script: sort_script()
+    data
 
-  test_line_candidates = test_name ->
+  test_line_candidates: test_name ->
     candidates = []
     candidates.push("def " + test_name)
     if test_name.starts_with("test_")
-      name = self.slice(test_name, 5, test_name.byte_len())
+      name = slice(test_name, 5, test_name.byte_len())
       candidates.push("test \"" + name + "\"")
       candidates.push("test '" + name + "'")
       words = name.replace("_", " ")
       candidates.push("test \"" + words + "\"")
       candidates.push("test '" + words + "'")
-    return candidates
+    candidates
 
-  test_link = row, source_base_url, source_root, source_cache, source_line_cache ->
-    label = self.escape(row["name"])
+  test_link: row, source_base_url, source_root, source_cache, source_line_cache ->
+    label = escape(row["name"])
     if source_base_url == "" or row["file"] == ""
       return label
     href = source_base_url + "/" + row["file"]
@@ -400,9 +408,9 @@ class Report
     )
     if line != ""
       href = href + "#L" + line
-    return "<a href=\"" + self.escape(href) + "\">" + label + "</a>"
+    "<a href=\"" + escape(href) + "\">" + label + "</a>"
 
-  top_rows = rows, field, limit ->
+  top_rows: rows, field, limit ->
     out = []
     used = {}
     while out.len() < limit and out.len() < rows.len()
@@ -419,24 +427,6 @@ class Report
         return out
       used[best_index.to_s()] = "true"
       out.push(best)
-    return out
+    out
 
-  top_sources = sources ->
-    out = []
-    used = {}
-    order = StringOrder()
-    while out.len() < sources.len()
-      best = nil
-      best_index = -1
-      i = 0
-      while i < sources.len()
-        if used[i.to_s()] == nil
-          if best == nil or order.less(sources[i]["key"], best["key"])
-            best = sources[i]
-            best_index = i
-        i = i + 1
-      if best == nil
-        return out
-      used[best_index.to_s()] = "true"
-      out.push(best)
-    return out
+  top_sources: sources -> sources.sort_by(source -> source["key"])

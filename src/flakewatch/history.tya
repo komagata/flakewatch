@@ -1,0 +1,109 @@
+import dir
+import file
+import json
+import path
+
+class History
+  junit: nil
+
+  initialize: ->
+    self.junit = JUnit()
+
+  collect_jsonl: root, out ->
+    if root == ""
+      root = "."
+    if not file.File.exists?(root)
+      return nil
+    for name in dir.Dir.list(root)
+      full = path.Path().join([root, name])
+      if name.ends_with(".jsonl")
+        out.push(full)
+      elseif not name.contains(".")
+        collect_jsonl(full, out)
+
+  export_file: opts ->
+    lines = []
+    for item in items_from_junit(opts)
+      lines.push(json.Json.dump(item))
+    file.File.write(opts["output"], lines.join("\n") + "\n")
+    println("wrote " + opts["output"])
+
+  files: patterns ->
+    out = []
+    for pattern in patterns
+      if pattern.contains("**/*.jsonl")
+        base = pattern.split("**/*.jsonl")[0]
+        if base.ends_with("/")
+          base = slice(base, 0, base.byte_len() - 1)
+        collect_jsonl(base, out)
+      elseif file.File.exists?(pattern)
+        out.push(pattern)
+    out.sort()
+
+  has_unsafe_json_chars: line ->
+    if line.contains("&")
+      return true
+    if line.byte_len() != line.len()
+      return true
+    i = 0
+    while i < line.byte_len()
+      if is_numeric_apostrophe_entity(line, i)
+        return true
+      i = i + 1
+    false
+
+  is_numeric_apostrophe_entity: line, i ->
+    if i + 4 >= line.byte_len()
+      return false
+    line[i] == "&"
+      and line[i + 2] == "3"
+      and line[i + 3] == "9"
+      and line[i + 4] == ";"
+
+  items_from_jsonl: patterns ->
+    out = []
+    for path_name in files(patterns)
+      text = file.File.read(path_name)
+      for line in text.split("\n")
+        if line != ""
+          if not has_unsafe_json_chars(line)
+            out.push(json.Json.parse(line))
+    out
+
+  items_from_junit: opts ->
+    out = []
+    for path_name in junit.files(opts["junit"])
+      for item in junit.parse_file(path_name)
+        record = record(opts, path_name, item)
+        out.push(record)
+    out
+
+  record: opts, junit_path, item ->
+    out =
+      repo: opts["repo"]
+      workflow: opts["workflow"]
+      run_id: opts["run_id"]
+      run_attempt: opts["run_attempt"]
+      job: opts["job"]
+      sha: opts["sha"]
+      branch: opts["branch"]
+      event: opts["event"]
+      junit_path: junit_path
+      suite: item["suite"]
+      timestamp: item["timestamp"]
+      classname: item["classname"]
+      name: item["name"]
+      file: item["file"]
+      line: item["line"]
+      duration: item["duration"]
+      status: item["status"]
+      message: item["message"]
+    out
+
+  slice: text, start, finish ->
+    out = ""
+    i = start
+    while i < finish
+      out = out + text[i]
+      i = i + 1
+    out

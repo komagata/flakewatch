@@ -1,0 +1,143 @@
+import os
+
+class Cli
+  history: nil
+
+  report: nil
+
+  initialize: ->
+    self.report = Report()
+    self.history = History()
+
+  default_options: spec ->
+    options = {}
+    for name in spec["options"].keys()
+      opt = spec["options"][name]
+      if opt.has("default")
+        options[name] = opt["default"]
+      elseif opt["type"] == "array"
+        options[name] = []
+      elseif opt["type"] == "bool"
+        options[name] = false
+    options
+
+  env_or: name, fallback ->
+    value = os.Os.env(name)
+    if value == nil or value == ""
+      return fallback
+    value
+
+  main: argv ->
+    opts = parse(argv)
+    command = opts["command"]
+    if command == "html"
+      report.render_html_file(opts)
+      return nil
+    if command == "jsonl"
+      history.export_file(opts)
+      return nil
+    if command == "doctor"
+      println("xml: ok")
+      println("github_actions: " + env_or("GITHUB_ACTIONS", "false"))
+      return nil
+    usage()
+    os.Os.exit(1)
+
+  option: typ, default_value ->
+    opt = { type: typ, default: default_value }
+    opt
+
+  option_spec: ->
+    options = {}
+    options["junit"] = option("array", [])
+    options["history"] = option("array", [])
+    options["output"] = option("string", "flakewatch.html")
+    options["source-base-url"] = option("string", "")
+    options["source-root"] = option("string", ".")
+    options["repo"] = option("string", env_or("GITHUB_REPOSITORY", "local"))
+    options["workflow"] = option("string", env_or("GITHUB_WORKFLOW", "local"))
+    options["run-id"] = option("string", env_or("GITHUB_RUN_ID", "local"))
+    options["run-attempt"] = option("string", env_or("GITHUB_RUN_ATTEMPT", "1"))
+    options["job"] = option("string", env_or("GITHUB_JOB", "local"))
+    options["sha"] = option("string", env_or("GITHUB_SHA", ""))
+    options["branch"] = option("string", env_or("GITHUB_REF_NAME", ""))
+    options["event"] = option("string", env_or("GITHUB_EVENT_NAME", ""))
+    options["os"] = option("string", env_or("RUNNER_OS", ""))
+    options["runtime"] = option("string", "")
+    options["started-at"] = option("string", "")
+    spec = { command: "flakewatch", options: options }
+    spec
+
+  parse: argv ->
+    command = "help"
+    if argv.len() > 0
+      command = argv[0]
+    args = []
+    i = 1
+    while i < argv.len()
+      args.push(argv[i])
+      i = i + 1
+    parsed = parse_options_or_exit(args, option_spec())
+    options = parsed["options"]
+    opts =
+      command: command
+      junit: options["junit"]
+      history: options["history"]
+      output: options["output"]
+      source_base_url: options["source-base-url"]
+      source_root: options["source-root"]
+      repo: options["repo"]
+      workflow: options["workflow"]
+      run_id: options["run-id"]
+      run_attempt: options["run-attempt"]
+      job: options["job"]
+      sha: options["sha"]
+      branch: options["branch"]
+      event: options["event"]
+      os: options["os"]
+      runtime: options["runtime"]
+      started_at: options["started-at"]
+    opts
+
+  parse_options_or_exit: args, spec ->
+    options = default_options(spec)
+    i = 0
+    while i < args.len()
+      arg = args[i]
+      if arg.starts_with("--")
+        name = slice(arg, 2, arg.byte_len())
+        if options.has(name)
+          opt = spec["options"][name]
+          typ = opt["type"]
+          if typ == "bool"
+            options[name] = true
+          else
+            i = i + 1
+            if i < args.len()
+              value = args[i]
+              if typ == "int"
+                options[name] = value.to_i()
+              elseif typ == "array"
+                options[name].push(value)
+              else
+                options[name] = value
+      i = i + 1
+    result = { options: options, errors: [] }
+    result
+
+  slice: text, start, finish ->
+    out = ""
+    i = start
+    while i < finish
+      out = out + text[i]
+      i = i + 1
+    out
+
+  usage: ->
+    println(
+      "usage: flakewatch html --junit 'test-results/**/*.xml' --output flakewatch.html"
+    )
+    println(
+      "       flakewatch jsonl --junit 'test-results/**/*.xml' --output run.jsonl"
+    )
+    println("       flakewatch doctor")
