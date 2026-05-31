@@ -1,0 +1,17 @@
+# Invocation stores the immutable invocation data passed to a command call.
+record Invocation
+  # Invocation.command stores the command object being invoked.
+  # @type Command
+  command: nil
+
+  # Invocation.path stores the full command path.
+  # @type Array
+  path: []
+
+  # Invocation.args stores the raw arguments passed to the command.
+  # @type Array
+  args: []
+
+  # Invocation.params stores parsed arguments and options by name.
+  # @type Dict
+  params: {}

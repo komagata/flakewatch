@@ -1,0 +1,151 @@
+import os
+import cli/* as cli
+
+# FlakewatchCommand defines the single flakewatch CLI command.
+class FlakewatchCommand extends cli.Application
+  # FlakewatchCommand.description stores root command help text.
+  # @type String
+  description: "Generate a static HTML report from JUnit XML"
+
+  # FlakewatchCommand.examples stores root command examples.
+  # @type Array
+  examples: ["--junit='test/reports/**/*.xml' --output=flakewatch.html"]
+
+  # FlakewatchCommand.options stores CLI options for report generation.
+  # @type Array
+  options: [
+    cli.Spec.option(
+      "junit",
+      "JUnit XML glob or file path",
+      {
+        default: [],
+        array: true
+      }
+    ),
+    cli.Spec.option(
+      "history",
+      "History file glob or file path",
+      {
+        default: [],
+        array: true
+      }
+    ),
+    cli.Spec.option(
+      "output",
+      "Output file path",
+      {
+        default: "flakewatch.html"
+      }
+    ),
+    cli.Spec.option(
+      "history-output",
+      "Write current run history to this path",
+      {
+        default: ""
+      }
+    ),
+    cli.Spec.option(
+      "source-base-url",
+      "Source base URL",
+      {
+        default: ""
+      }
+    ),
+    cli.Spec.option("source-root", "Source root", { default: "." }),
+    cli.Spec.option("repo", "Repository name", { default: "" }),
+    cli.Spec.option("workflow", "Workflow name", { default: "" }),
+    cli.Spec.option("run-id", "Run ID", { default: "" }),
+    cli.Spec.option("run-attempt", "Run attempt", { default: "" }),
+    cli.Spec.option("job", "Job name", { default: "" }),
+    cli.Spec.option("sha", "Commit SHA", { default: "" }),
+    cli.Spec.option("branch", "Branch name", { default: "" }),
+    cli.Spec.option("event", "Event name", { default: "" }),
+    cli.Spec.option("os", "Runner OS", { default: "" }),
+    cli.Spec.option("runtime", "Runtime name", { default: "" }),
+    cli.Spec.option("started-at", "Run start time", { default: "" })
+  ]
+
+  # FlakewatchCommand.call renders a report and optionally writes history.
+  # @param invocation cli.Invocation parsed command invocation.
+  # @return cli.Result command result.
+  call: invocation ->
+    for arg in invocation.args
+      if not arg.starts_with("-")
+        return cli.Result.failure(
+          "ERROR: \"flakewatch\" was called with arguments \"{arg}\""
+        )
+    if invocation.args.len() == 0
+      return cli.Result.success(summary_help())
+    options = opts(invocation)
+    Report().render_file(options)
+    if options["history_output"] != ""
+      history_options = options
+      history_options["output"] = options["history_output"]
+      History().export_file(history_options)
+    cli.Result.success("")
+
+  # FlakewatchCommand.env_or returns an environment variable or a fallback.
+  # @param name String environment variable name.
+  # @param fallback String fallback value.
+  # @return String selected value.
+  env_or: name, fallback ->
+    value = os.Os.env(name)
+    value_or(value, fallback)
+
+  # FlakewatchCommand.opts converts invocation params into report options.
+  # @param invocation cli.Invocation parsed command invocation.
+  # @return Dict normalized report options.
+  opts: invocation ->
+    params = invocation.params
+    out =
+      command: name
+      junit: params["junit"]
+      history: params["history"]
+      output: params["output"]
+      history_output: params["history-output"]
+      source_base_url: params["source-base-url"]
+      source_root: params["source-root"]
+      repo: value_or(params["repo"], env_or("GITHUB_REPOSITORY", "local"))
+      workflow: value_or(params["workflow"], env_or("GITHUB_WORKFLOW", "local"))
+      run_id: value_or(params["run-id"], env_or("GITHUB_RUN_ID", "local"))
+      run_attempt: value_or(
+        params["run-attempt"],
+        env_or("GITHUB_RUN_ATTEMPT", "1")
+      )
+      job: value_or(params["job"], env_or("GITHUB_JOB", "local"))
+      sha: value_or(params["sha"], env_or("GITHUB_SHA", ""))
+      branch: value_or(params["branch"], env_or("GITHUB_REF_NAME", ""))
+      event: value_or(params["event"], env_or("GITHUB_EVENT_NAME", ""))
+      os: value_or(params["os"], env_or("RUNNER_OS", ""))
+      runtime: params["runtime"]
+      started_at: params["started-at"]
+    out
+
+  # FlakewatchCommand.summary_help returns concise help for no-arg execution.
+  # @return String help text.
+  summary_help: ->
+    join(
+      [
+        "Usage:",
+        "  flakewatch --junit=PATH [options]",
+        "",
+        "Options:",
+        "  --junit # JUnit XML glob or file path",
+        "  --output # HTML report output file path",
+        "  --history # History file glob or file path",
+        "  --history-output # Write current run history to this path",
+        "  --source-base-url # Source base URL",
+        "  --source-root # Source root",
+        "  --help, -h # Print this help"
+      ],
+      "\n"
+    )
+
+  # FlakewatchCommand.value_or returns fallback when value is nil or empty.
+  # @param value Any candidate value.
+  # @param fallback Any fallback value.
+  # @return Any selected value.
+  value_or: value, fallback ->
+    if value == nil or value == ""
+      return fallback
+    value

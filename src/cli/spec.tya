@@ -1,0 +1,47 @@
+# Spec builds CLI argument and option specs.
+class Spec
+  # Spec.argument builds a positional argument spec.
+  # @param name String argument name.
+  # @param description String help text.
+  # @param options Dict optional settings.
+  # @return Dict argument spec.
+  static argument: name, description = "", options = {} ->
+    required = false
+    array = false
+    if options.has?("required")
+      required = options["required"]
+    if options.has?("array")
+      array = options["array"]
+    { argname: name, description: description, required: required, array: array }
+
+  # Spec.boolean_option builds a boolean option spec.
+  # @param name String option name.
+  # @param description String help text.
+  # @param default Boolean default value.
+  # @param options Dict optional settings.
+  # @return Dict option spec.
+  static boolean_option: name, description = "", default = false, options = {} ->
+    aliases = []
+    if options.has?("aliases")
+      aliases = options["aliases"]
+    { name: name, description: description, default: default, boolean: true, array: false, aliases: aliases, allowed: [] }
+
+  # Spec.option builds an option spec.
+  # @param name String option name.
+  # @param description String help text.
+  # @param options Dict optional settings.
+  # @return Dict option spec.
+  static option: name, description = "", options = {} ->
+    default = nil
+    array = false
+    aliases = []
+    allowed = []
+    if options.has?("default")
+      default = options["default"]
+    if options.has?("array")
+      array = options["array"]
+    if options.has?("aliases")
+      aliases = options["aliases"]
+    if options.has?("allowed")
+      allowed = options["allowed"]
+    { name: name, description: description, default: default, boolean: false, array: array, aliases: aliases, allowed: allowed }

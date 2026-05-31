@@ -3,9 +3,9 @@ description: Generate a static HTML report for flaky and slow tests from JUnit X
 
 inputs:
   junit:
-    description: JUnit XML glob. Use **/*.xml for recursive matching.
+    description: JUnit XML glob. Defaults to minitest-ci output.
     required: false
-    default: test-results/**/*.xml
+    default: test/reports/**/*.xml
   output:
     description: HTML report output path.
     required: false
@@ -145,35 +145,35 @@ runs:
         fi
 
         args=(
-          html
-          --junit "${{ inputs.junit }}"
-          --output "${{ inputs.output }}"
-          --source-base-url "$source_base_url"
-          --source-root "${{ inputs['source-root'] }}"
+          "--junit=${{ inputs.junit }}"
+          "--output=${{ inputs.output }}"
+          "--source-base-url=$source_base_url"
+          "--source-root=${{ inputs['source-root'] }}"
         )
 
         if [ -n "$HISTORY_PATTERN" ]; then
-          args+=(--history "$HISTORY_PATTERN")
+          args+=("--history=$HISTORY_PATTERN")
+        fi
+
+        if [ -n "${{ steps.flakewatch-history.outputs.dir }}" ]; then
+          if [ "${{ inputs.history-write }}" = "true" ] || { [ "${{ inputs.history-write }}" = "auto" ] && [ "${{ github.event_name }}" != "pull_request" ]; }; then
+            day="$(date -u +%Y/%m/%d)"
+            run_file="${{ steps.flakewatch-history.outputs.dir }}/history/${day}/run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}.jsonl"
+            mkdir -p "$(dirname "$run_file")"
+            args+=("--history-output=$run_file")
+          fi
         fi
 
         flakewatch "${args[@]}"
         test -s "${{ inputs.output }}"
 
-    - name: Write flakewatch history
+    - name: Commit flakewatch history
       if: inputs.history-branch != '' && (inputs.history-write == 'true' || (inputs.history-write == 'auto' && github.event_name != 'pull_request'))
       shell: bash
       env:
         HISTORY_DIR: ${{ steps.flakewatch-history.outputs.dir }}
         HISTORY_BRANCH: ${{ inputs.history-branch }}
       run: |
-        day="$(date -u +%Y/%m/%d)"
-        run_file="${HISTORY_DIR}/history/${day}/run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}.jsonl"
-        mkdir -p "$(dirname "$run_file")"
-
-        flakewatch jsonl \
-          --junit "${{ inputs.junit }}" \
-          --output "$run_file"
-
         cd "$HISTORY_DIR"
         git add history
         git commit -m "Add flakewatch history for run ${GITHUB_RUN_ID}" || exit 0

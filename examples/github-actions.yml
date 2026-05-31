@@ -16,20 +16,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Run your normal test command here. Configure it to write JUnit XML.
-      # Replace this example with your project's actual test command.
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
       - name: Run tests
-        run: |
-          bundle exec rspec \
-            --format progress \
-            --format RspecJunitFormatter \
-            --out test-results/rspec.xml
+        run: bundle exec rails test
 
       - name: Generate flakewatch report
         if: always()
         uses: komagata/flakewatch@v0.6.16
-        with:
-          junit: "test-results/**/*.xml"
 
   matrix-test:
     runs-on: ubuntu-latest

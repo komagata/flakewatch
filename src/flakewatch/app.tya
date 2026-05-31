@@ -1,0 +1,7 @@
+import flakewatch/flakewatch_command
+
+# App is the concrete flakewatch CLI application.
+class App extends FlakewatchCommand
+  # App.name stores the executable name used in help output.
+  # @type String
+  name: "flakewatch"

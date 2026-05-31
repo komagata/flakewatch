@@ -1,0 +1,33 @@
+# Result stores a CLI command result.
+class Result
+  # Result.output stores text to print for the command result.
+  # @type String
+  output: ""
+
+  # Result.status stores the process-style exit status.
+  # @type Int
+  status: 0
+
+  # Result.failure builds a failed result with status 1.
+  # @param output String output text.
+  # @return Result failed result.
+  static failure: output = "" -> Result(1, output)
+
+  # Result.failure_status builds a failed result with a custom status.
+  # @param status Int exit status.
+  # @param output String output text.
+  # @return Result failed result.
+  static failure_status: status, output = "" -> Result(status, output)
+
+  # Result.success builds a successful result with status 0.
+  # @param output String output text.
+  # @return Result successful result.
+  static success: output = "" -> Result(0, output)
+
+  # Result.initialize initializes a command result.
+  # @param status Int exit status.
+  # @param output String output text.
+  # @return Self the initialized result.
+  initialize: status = 0, output = "" ->
+    self.status = status
+    self.output = output

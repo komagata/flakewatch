@@ -7,7 +7,7 @@ generate, upload, and link the HTML report.
 
 The default HTML workflow does not need a cache or restored artifacts.
 
-## Quick start
+## Local CI
 
 Install the released Linux amd64 binary:
 
@@ -15,15 +15,22 @@ Install the released Linux amd64 binary:
 curl -fsSL https://raw.githubusercontent.com/komagata/flakewatch/main/install.sh | sh
 ```
 
-Generate a report from JUnit XML:
+For local CI or a self-managed runner, store both the HTML report and history
+files on the local filesystem:
 
 ```sh
-flakewatch html \
-  --junit "test-results/**/*.xml" \
-  --output flakewatch.html \
-  --source-base-url "https://github.com/OWNER/REPO/blob/COMMIT_SHA" \
-  --source-root "."
+bundle exec rails test
+
+mkdir -p tmp/flakewatch/history
+
+flakewatch \
+  --junit="test/reports/**/*.xml" \
+  --history="tmp/flakewatch/history/**/*.jsonl" \
+  --history-output="tmp/flakewatch/history/run-$(date -u +%Y%m%d%H%M%S).jsonl" \
+  --output="tmp/flakewatch/report.html"
 ```
+
+Open `tmp/flakewatch/report.html` in a browser to inspect the report.
 
 The report contains:
 
@@ -41,27 +48,53 @@ The report contains:
 
 ## GitHub Actions
 
-Configure your test command to write JUnit XML, then run the Flakewatch action:
+The most common path is GitHub Actions with Rails, Minitest, and
+[`minitest-ci`](https://rubygems.org/gems/minitest-ci). Add the test reporter:
+
+```ruby
+# Gemfile
+group :test do
+  gem "minitest-ci"
+end
+```
+
+Require it from the Rails test helper:
+
+```ruby
+# test/test_helper.rb
+require "minitest/ci"
+```
+
+Then run the Rails tests and pass the generated JUnit XML files to Flakewatch:
 
 ```yaml
+name: CI
+
+on:
+  pull_request:
+  push:
+
 permissions:
   contents: read
   pull-requests: write
 
-- uses: actions/checkout@v4
+jobs:
+  test:
+    runs-on: ubuntu-latest
 
-- name: Run tests
-  run: |
-    bundle exec rspec \
-      --format progress \
-      --format RspecJunitFormatter \
-      --out test-results/rspec.xml
+    steps:
+      - uses: actions/checkout@v4
 
-- name: Generate flakewatch report
-  if: always()
-  uses: komagata/flakewatch@v0.6.16
-  with:
-    junit: "test-results/**/*.xml"
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Run tests
+        run: bundle exec rails test
+
+      - name: Generate flakewatch report
+        if: always()
+        uses: komagata/flakewatch@v0.6.16
 ```
 
 By default, the action:
@@ -77,6 +110,11 @@ description. If the token cannot update the pull request, the action keeps the
 CI job green and the job summary still links to the artifact.
 
 See `examples/github-actions.yml` for a complete workflow shape.
+
+For other test stacks, see the GitHub Wiki:
+
+- [Rails + RSpec](https://github.com/komagata/flakewatch/wiki/Rails-and-RSpec)
+- [Django + pytest](https://github.com/komagata/flakewatch/wiki/Django-and-pytest)
 
 ### Matrix Test Jobs
 
@@ -141,7 +179,6 @@ permissions:
   if: always()
   uses: komagata/flakewatch@v0.6.16
   with:
-    junit: "test-results/**/*.xml"
     history-branch: flakewatch-data
 ```
 
@@ -168,7 +205,6 @@ permissions:
   if: always()
   uses: komagata/flakewatch@v0.6.16
   with:
-    junit: "test-results/**/*.xml"
     history-branch: flakewatch-data
     history-write: true
 ```
@@ -181,7 +217,7 @@ visible in the job log.
 
 | Input | Default | Description |
 |---|---|---|
-| `junit` | `test-results/**/*.xml` | JUnit XML glob. Use `**/*.xml` for recursive matching. |
+| `junit` | `test/reports/**/*.xml` | JUnit XML glob. The default matches `minitest-ci` output. |
 | `output` | `flakewatch.html` | HTML report output path. |
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
@@ -197,21 +233,16 @@ visible in the job log.
 | `history-branch` | empty | Git branch used to persist JSONL test history. |
 | `history-write` | `auto` | Write JSONL history to `history-branch`. `auto` writes outside pull request events. |
 
-## Commands
+## Command
 
 ```sh
-flakewatch html \
-  --junit "test-results/**/*.xml" \
-  --history "flakewatch-history/history/**/*.jsonl" \
-  --output flakewatch.html \
-  --source-base-url "https://github.com/OWNER/REPO/blob/COMMIT_SHA" \
-  --source-root "."
-
-flakewatch jsonl \
-  --junit "test-results/**/*.xml" \
-  --output "history/2026/05/18/run-123456789-attempt-1.jsonl"
-
-flakewatch doctor
+flakewatch \
+  --junit="test-results/**/*.xml" \
+  --history="flakewatch-history/history/**/*.jsonl" \
+  --history-output="flakewatch-history/history/run.jsonl" \
+  --output=flakewatch.html \
+  --source-base-url="https://github.com/OWNER/REPO/blob/COMMIT_SHA" \
+  --source-root="."
 ```
 
 `--source-base-url` enables GitHub links in the report. `--source-root` points

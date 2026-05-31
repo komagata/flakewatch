@@ -1,42 +1,101 @@
 import file
+import os
 import unittest/* as *
 import flakewatch/*
 
 class FlakewatchTest extends TestCase
-  test_cli_parse_uses_typed_options: ->
-    opts = flakewatch
-      .Cli()
-      .parse(["html", "--junit", "run1.xml", "--junit", "run2.xml", "--history", "history/**/*.jsonl", "--source-base-url", "https://example.test/repo/blob/sha", "--source-root", "app", "--run-id", "123", "--started-at", "2026-05-21T00:00:00Z"])
-    assert_equal("html", opts["command"], "command")
-    assert_equal(2, opts["junit"].len(), "array option")
-    assert_equal("run2.xml", opts["junit"][1], "second junit")
-    assert_equal("history/**/*.jsonl", opts["history"][0], "history")
-    self.assert_equal(
-      "https://example.test/repo/blob/sha",
-      opts["source_base_url"],
-      "hyphenated option"
+  test_cli_accepts_tya_cli_options: ->
+    output_path = "tmp/flakewatch-cli-test.html"
+    if file.File.exists?(output_path)
+      file.File.remove(output_path)
+    outcome = flakewatch
+      .App()
+      .run(["--junit=tests/fixtures/junit/run1.xml", "--output=" + output_path, "--source-base-url=https://example.test/repo/blob/sha"])
+    assert_equal(0, outcome.status, "status")
+    html = file.File.read(output_path)
+    assert(html.contains("pkg.FlakyTest.alternates"), "report rendered")
+    assert(
+      html.contains("https://example.test/repo/blob/sha/flaky_test.tya#L8"),
+      "source link"
     )
-    assert_equal("app", opts["source_root"], "source root")
-    assert_equal("123", opts["run_id"], "metadata option")
-    assert_equal("2026-05-21T00:00:00Z", opts["started_at"], "started_at")
+
+  test_cli_app_reports_option_errors: ->
+    outcome = flakewatch.App().run(["--unknown=true"])
+    assert_equal(1, outcome.status, "status")
+    assert_equal(
+      "ERROR: \"flakewatch\" was called with arguments \"--unknown=true\"",
+      outcome.output,
+      "error"
+    )
+
+  test_cli_history_output_accepts_comma_separated_arrays: ->
+    output_path = "tmp/flakewatch-comma-history.jsonl"
+    html_path = "tmp/flakewatch-comma-history.html"
+    if file.File.exists?(output_path)
+      file.File.remove(output_path)
+    if file.File.exists?(html_path)
+      file.File.remove(html_path)
+    outcome = flakewatch
+      .App()
+      .run(["--junit=tests/fixtures/junit/run1.xml,tests/fixtures/junit/run2.xml", "--output=" + html_path, "--history-output=" + output_path])
+    assert_equal(0, outcome.status, "status")
+    jsonl = file.File.read(output_path)
+    assert(jsonl.contains("pkg.FlakyTest"), "first file")
+    assert(jsonl.contains("pkg.AlwaysFailTest"), "second file")
+
+  test_cli_writes_history_with_environment_defaults: ->
+    os.Os.setenv("GITHUB_REPOSITORY", "example/repo")
+    output_path = "tmp/flakewatch-env-history.jsonl"
+    html_path = "tmp/flakewatch-env-history.html"
+    if file.File.exists?(output_path)
+      file.File.remove(output_path)
+    if file.File.exists?(html_path)
+      file.File.remove(html_path)
+    outcome = flakewatch
+      .App()
+      .run(["--junit=tests/fixtures/junit/run1.xml", "--output=" + html_path, "--history-output=" + output_path])
+    os.Os.unsetenv("GITHUB_REPOSITORY")
+    assert_equal(0, outcome.status, "status")
+    html = file.File.read(html_path)
+    assert(html.contains("pkg.FlakyTest.alternates"), "report")
+    jsonl = file.File.read(output_path)
+    assert(jsonl.contains("\"repo\":\"example/repo\""), "repo")
+    assert(jsonl.contains("\"workflow\":\"local\""), "fallback")
+
+  test_command_help_uses_tya_cli_application: ->
+    outcome = flakewatch.App().run(["--help"])
+    assert_equal(0, outcome.status, "status")
+    assert(outcome.output.contains("Command:\n  flakewatch"), "command")
+    assert(
+      outcome.output.contains("--junit # JUnit XML glob or file path"),
+      "junit option"
+    )
+    assert(
+      outcome.output.contains("Examples:\n  flakewatch --junit"),
+      "example"
+    )
 
   test_html_report_links_to_source_files: ->
     html = flakewatch
       .Report()
-      .html_from_junit_with_source(["tests/fixtures/junit/run1.xml"], "https://github.com/example/app/blob/abc123")
+      .html({ junit: ["tests/fixtures/junit/run1.xml"], source_base_url: "https://github.com/example/app/blob/abc123" })
     self.assert(
-      html.contains("https://github.com/example/app/blob/abc123/flaky_test.tya#L8"),
+      html.contains(
+        "https://github.com/example/app/blob/abc123/flaky_test.tya#L8"
+      ),
       "source link"
     )
     self.assert(
-      html.contains("https://github.com/example/app/blob/abc123/tests/fixtures/source/user_events_test.rb#L2"),
+      html.contains(
+        "https://github.com/example/app/blob/abc123/tests/fixtures/source/user_events_test.rb#L2"
+      ),
       "inferred source line"
     )
 
   test_html_report_ranks_tests_without_time_as_zero_seconds: ->
     html = flakewatch
       .Report()
-      .html_from_junit(["tests/fixtures/junit/no_time.xml"])
+      .html({ junit: ["tests/fixtures/junit/no_time.xml"] })
     assert(html.contains("<h2>Slow Tests</h2>"), "slow section")
     assert(html.contains("pkg.NoTimeTest.still_ranks"), "zero duration test")
     assert(html.contains("<td class=\"num\">0</td>"), "zero seconds")
@@ -45,7 +104,7 @@ class FlakewatchTest extends TestCase
   test_html_report_renders_flaky_and_slow_tests_without_database: ->
     html = flakewatch
       .Report()
-      .html_from_junit(["tests/fixtures/junit/**/*.xml"])
+      .html({ junit: ["tests/fixtures/junit/**/*.xml"] })
     assert(html.contains("<h2>Flaky Tests</h2>"), "flaky section")
     assert(html.contains("<h2>Healed Candidates</h2>"), "healed section")
     assert(html.contains("<h2>Failing Tests</h2>"), "failing section")
@@ -65,7 +124,7 @@ class FlakewatchTest extends TestCase
     assert(html.contains("querySelectorAll('th[data-sort]')"), "sort script")
     assert(html.contains("<style>"), "embedded style")
     self.assert(
-      html.contains(".metric strong" + chr(123) + "display:block;font-size:28px" + chr(125)),
+      html.contains(".metric strong") and html.contains("font-size: 28px"),
       "metric style"
     )
     assert(html.contains("pkg.FlakyTest.alternates"), "flaky test")
@@ -83,7 +142,7 @@ class FlakewatchTest extends TestCase
       .export_file({ output: history_path, junit: ["tests/fixtures/junit/run1.xml"], repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "a", branch: "main", event: "push" })
     html = flakewatch
       .Report()
-      .html_from_junit_with_source_root_and_history(["tests/fixtures/junit/run2.xml"], [history_path], "", ".")
+      .html({ junit: ["tests/fixtures/junit/run2.xml"], history: [history_path], source_base_url: "", source_root: "." })
     self.assert(
       html.contains("pkg.FlakyTest.alternates"),
       "history creates flake signal"
@@ -129,3 +188,12 @@ class FlakewatchTest extends TestCase
     assert_equal("stderr text", one[1]["system_err"], "stderr")
     assert_equal("skipped", one[2]["status"], "skipped")
     assert_equal("error", two[2]["status"], "error")
+
+  test_root_help_uses_tya_cli_application: ->
+    outcome = flakewatch.App().run([])
+    assert_equal(0, outcome.status, "status")
+    assert(
+      outcome.output.contains("Usage:\n  flakewatch --junit=PATH"),
+      "usage"
+    )
+    assert(outcome.output.contains("--history-output"), "history output")

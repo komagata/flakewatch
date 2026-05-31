@@ -1,0 +1,150 @@
+# Command defines one CLI command and its metadata.
+class Command
+  # Command.aliases stores alternative names for the command.
+  # @type Array
+  aliases: []
+
+  # Command.arguments stores positional argument specs.
+  # @type Array
+  arguments: []
+
+  # Command.commands stores nested commands.
+  # @type Array
+  commands: []
+
+  # Command.description stores help text for the command.
+  # @type String
+  description: ""
+
+  # Command.examples stores example command suffixes.
+  # @type Array
+  examples: []
+
+  # Command.hidden controls whether the command appears in command lists.
+  # @type Boolean
+  hidden: false
+
+  # Command.name stores the primary command name.
+  # @type String
+  name: ""
+
+  # Command.options stores option specs.
+  # @type Array
+  options: []
+
+  # Command.initialize initializes command metadata.
+  # @param name String primary command name.
+  # @param description String command help text.
+  # @param aliases Array alternative command names.
+  # @return Self the initialized command.
+  initialize: name = nil, description = nil, aliases = nil ->
+    if name != nil
+      self.name = name
+    if description != nil
+      self.description = description
+    if aliases != nil
+      self.aliases = aliases
+
+  # Command.argument registers a positional argument spec.
+  # @param spec Dict argument spec.
+  # @return Self this command.
+  argument: spec ->
+    arguments.push(spec)
+    self
+
+  # Command.call executes the command.
+  # @param _invocation Invocation invocation data.
+  # @return Result command result.
+  call: _invocation ->
+    Result.failure("Command {self.name} does not implement call")
+
+  # Command.example registers an example line for help output.
+  # @param text String example suffix.
+  # @return Self this command.
+  example: text ->
+    examples.push(text)
+    self
+
+  # Command.find returns a matching nested command by name or alias.
+  # @param name String command name or alias.
+  # @return Command? matching nested command.
+  find: name ->
+    for command in commands
+      if command.matches?(name)
+        return command
+    nil
+
+  # Command.help_line returns one command-list help line.
+  # @param prefix Array command path prefix.
+  # @return String formatted help line.
+  help_line: prefix ->
+    usage = usage_for(prefix)
+    if description == ""
+      usage
+    else
+      "{usage} # {self.description}"
+
+  # Command.matches? returns whether candidate matches name or aliases.
+  # @param candidate String command name candidate.
+  # @return Boolean whether the command matches.
+  matches?: candidate ->
+    if candidate == name
+      return true
+    for alias in aliases
+      if candidate == alias
+        return true
+    false
+
+  # Command.option registers an option spec.
+  # @param spec Dict option spec.
+  # @return Self this command.
+  option: spec ->
+    options.push(spec)
+    self
+
+  # Command.register registers a nested subcommand.
+  # @param command Command nested command to register.
+  # @return Self this command.
+  register: command ->
+    commands.push(command)
+    self
+
+  # Command.usage_for returns usage text for this command.
+  # @param prefix Array command path prefix.
+  # @return String usage text.
+  usage_for: prefix ->
+    parts = []
+    for item in prefix
+      parts.push(item)
+    if name != ""
+      parts.push(name)
+    if commands.len() > 0
+      parts.push("[SUBCOMMAND]")
+    for argument in arguments
+      parts.push(argument_label(argument))
+    join(parts, " ")
+
+  # Command.argument_label formats one positional argument spec.
+  # @param spec Dict argument spec.
+  # @return String formatted argument label.
+  private argument_label: spec ->
+    argname = spec["argname"]
+    upper = argname.upper()
+    if spec["required"]
+      upper
+    else
+      "[{upper}]"
+
+  # Command.join joins values with a separator.
+  # @param values Array values to join.
+  # @param separator String separator text.
+  # @return String joined text.
+  private join: values, separator ->
+    text = ""
+    i = 0
+    while i < values.len()
+      if i > 0
+        text = "{text}{separator}"
+      text = "{text}{values[i]}"
+      i = i + 1
+    text

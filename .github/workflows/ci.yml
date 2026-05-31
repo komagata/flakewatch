@@ -21,8 +21,8 @@ jobs:
 
       - name: Install Tya
         run: |
-          curl -L https://github.com/komagata/tya/releases/download/v0.67.2/tya-v0.67.2-linux-amd64.tar.gz | tar xz
-          cd tya-v0.67.2-linux-amd64
+          curl -L https://github.com/komagata/tya/releases/download/v0.72.5/tya-v0.72.5-linux-amd64.tar.gz | tar xz
+          cd tya-v0.72.5-linux-amd64
           PREFIX="$RUNNER_TEMP/tya" ./install.sh
           echo "$RUNNER_TEMP/tya/bin" >> "$GITHUB_PATH"
 
