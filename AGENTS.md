@@ -4,7 +4,7 @@
 
 `flakewatch` is a Tya CLI for turning JUnit XML and optional JSONL history into static reports for flaky tests. The entrypoint is `src/main.tya`, which imports the package modules under `src/flakewatch/`.
 
-- `src/flakewatch/app.tya`, `flakewatch_command.tya`: command parsing and CLI dispatch.
+- `src/flakewatch/application.tya`: command parsing and CLI dispatch.
 - `src/flakewatch/j_unit.tya`, `history.tya`, `report.tya`: JUnit parsing, JSONL history, scoring, and static report output.
 - `tests/flakewatch_test.tya`: project tests.
 - `tests/fixtures/junit/`: sample JUnit XML inputs.
@@ -16,7 +16,7 @@
 - `tya test`: run the full test suite, including dependency tests.
 - `tya test tests/flakewatch_test.tya`: run only this project’s tests.
 - `tya lint src tests`: run Tya linting on source and tests.
-- `tya format -w src/flakewatch/flakewatch_command.tya`: format a touched file in place.
+- `tya format -w src/flakewatch/application.tya`: format a touched file in place.
 - `tya build src/main.tya -o flakewatch`: build a local executable.
 - `tya run src/main.tya --junit "tests/fixtures/junit/**/*.xml" --output tmp/flakewatch.html`: generate the static report without building.
 

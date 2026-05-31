@@ -9,7 +9,7 @@ class FlakewatchTest extends TestCase
     if file.File.exists?(output_path)
       file.File.remove(output_path)
     outcome = flakewatch
-      .App()
+      .Application()
       .run(["--junit=tests/fixtures/junit/run1.xml", "--output=" + output_path, "--source-base-url=https://example.test/repo/blob/sha"])
     assert_equal(0, outcome.status, "status")
     html = file.File.read(output_path)
@@ -20,7 +20,7 @@ class FlakewatchTest extends TestCase
     )
 
   test_cli_app_reports_option_errors: ->
-    outcome = flakewatch.App().run(["--unknown=true"])
+    outcome = flakewatch.Application().run(["--unknown=true"])
     assert_equal(1, outcome.status, "status")
     assert_equal(
       "ERROR: \"flakewatch\" was called with arguments \"--unknown=true\"",
@@ -36,7 +36,7 @@ class FlakewatchTest extends TestCase
     if file.File.exists?(html_path)
       file.File.remove(html_path)
     outcome = flakewatch
-      .App()
+      .Application()
       .run(["--junit=tests/fixtures/junit/run1.xml,tests/fixtures/junit/run2.xml", "--output=" + html_path, "--history-output=" + output_path])
     assert_equal(0, outcome.status, "status")
     jsonl = file.File.read(output_path)
@@ -52,7 +52,7 @@ class FlakewatchTest extends TestCase
     if file.File.exists?(html_path)
       file.File.remove(html_path)
     outcome = flakewatch
-      .App()
+      .Application()
       .run(["--junit=tests/fixtures/junit/run1.xml", "--output=" + html_path, "--history-output=" + output_path])
     os.Os.unsetenv("GITHUB_REPOSITORY")
     assert_equal(0, outcome.status, "status")
@@ -63,7 +63,7 @@ class FlakewatchTest extends TestCase
     assert(jsonl.contains("\"workflow\":\"local\""), "fallback")
 
   test_command_help_uses_tya_cli_application: ->
-    outcome = flakewatch.App().run(["--help"])
+    outcome = flakewatch.Application().run(["--help"])
     assert_equal(0, outcome.status, "status")
     assert(outcome.output.contains("Command:\n  flakewatch"), "command")
     assert(
@@ -190,7 +190,7 @@ class FlakewatchTest extends TestCase
     assert_equal("error", two[2]["status"], "error")
 
   test_root_help_uses_tya_cli_application: ->
-    outcome = flakewatch.App().run([])
+    outcome = flakewatch.Application().run([])
     assert_equal(0, outcome.status, "status")
     assert(
       outcome.output.contains("Usage:\n  flakewatch --junit=PATH"),

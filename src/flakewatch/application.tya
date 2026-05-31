@@ -1,0 +1,167 @@
+import os
+import cli/* as cli
+
+# Application defines the single flakewatch CLI command.
+class Application extends cli.Application
+  # Application.description stores root command help text.
+  # @type String
+  description: "Generate a static HTML report from JUnit XML"
+
+  # Application.examples stores root command examples.
+  # @type Array
+  examples: ["--junit='test/reports/**/*.xml' --output=flakewatch.html"]
+
+  # Application.name stores the executable name used in help output.
+  # @type String
+  name: "flakewatch"
+
+  # Application.options stores CLI options for report generation.
+  # @type Array
+  options: [
+    cli.Spec.option(
+      "junit",
+      "JUnit XML glob or file path",
+      {
+        default: [],
+        array: true
+      }
+    ),
+    cli.Spec.option(
+      "history",
+      "History file glob or file path",
+      {
+        default: [],
+        array: true
+      }
+    ),
+    cli.Spec.option(
+      "output",
+      "Output file path",
+      {
+        default: "flakewatch.html"
+      }
+    ),
+    cli.Spec.option(
+      "history-output",
+      "Write current run history to this path",
+      {
+        default: ""
+      }
+    ),
+    cli.Spec.option(
+      "source-base-url",
+      "Source base URL",
+      {
+        default: ""
+      }
+    ),
+    cli.Spec.option("source-root", "Source root", { default: "." }),
+    cli.Spec.option("repo", "Repository name"),
+    cli.Spec.option("workflow", "Workflow name"),
+    cli.Spec.option("run-id", "Run ID"),
+    cli.Spec.option("run-attempt", "Run attempt"),
+    cli.Spec.option("job", "Job name"),
+    cli.Spec.option("sha", "Commit SHA"),
+    cli.Spec.option("branch", "Branch name"),
+    cli.Spec.option("event", "Event name"),
+    cli.Spec.option("os", "Runner OS"),
+    cli.Spec.option("runtime", "Runtime name"),
+    cli.Spec.option("started-at", "Run start time")
+  ]
+
+  # Application.run_and_exit runs the CLI from argv and exits the process.
+  # @param argv Array command-line arguments.
+  # @return Nil exits the process.
+  static run_and_exit: argv -> Application().run_and_exit(argv)
+
+  # Application.call renders a report and optionally writes history.
+  # @param invocation cli.Invocation parsed command invocation.
+  # @return cli.Result command result.
+  call: invocation ->
+    if invocation.args.len() == 0
+      return cli.Result.success(summary_help())
+    validation = validate_args(invocation)
+    if validation != nil
+      return validation
+    options = opts(invocation)
+    render_report(options)
+    write_history(options)
+    cli.Result.success("")
+
+  # Application.opts converts invocation params into report options.
+  # @param invocation cli.Invocation parsed command invocation.
+  # @return Dict normalized report options.
+  opts: invocation ->
+    params = invocation.params
+    github_repository = os.Os.env("GITHUB_REPOSITORY")
+    github_workflow = os.Os.env("GITHUB_WORKFLOW")
+    github_run_id = os.Os.env("GITHUB_RUN_ID")
+    github_run_attempt = os.Os.env("GITHUB_RUN_ATTEMPT")
+    github_job = os.Os.env("GITHUB_JOB")
+    github_sha = os.Os.env("GITHUB_SHA")
+    github_ref_name = os.Os.env("GITHUB_REF_NAME")
+    github_event_name = os.Os.env("GITHUB_EVENT_NAME")
+    runner_os = os.Os.env("RUNNER_OS")
+    out =
+      command: name
+      junit: params["junit"]
+      history: params["history"]
+      output: params["output"]
+      history_output: params["history-output"]
+      source_base_url: params["source-base-url"]
+      source_root: params["source-root"]
+      repo: params["repo"] ?? github_repository ?? "local"
+      workflow: params["workflow"] ?? github_workflow ?? "local"
+      run_id: params["run-id"] ?? github_run_id ?? "local"
+      run_attempt: params["run-attempt"] ?? github_run_attempt ?? "1"
+      job: params["job"] ?? github_job ?? "local"
+      sha: params["sha"] ?? github_sha ?? ""
+      branch: params["branch"] ?? github_ref_name ?? ""
+      event: params["event"] ?? github_event_name ?? ""
+      os: params["os"] ?? runner_os ?? ""
+      runtime: params["runtime"] ?? ""
+      started_at: params["started-at"] ?? ""
+    out
+
+  # Application.render_report writes the HTML report.
+  # @param options Dict normalized report options.
+  # @return Nil
+  render_report: options -> Report().render_file(options)
+
+  # Application.summary_help returns concise help for no-arg execution.
+  # @return String help text.
+  summary_help: ->
+    """
+    Usage:
+      flakewatch --junit=PATH [options]
+
+    Options:
+      --junit # JUnit XML glob or file path
+      --output # HTML report output file path
+      --history # History file glob or file path
+      --history-output # Write current run history to this path
+      --source-base-url # Source base URL
+      --source-root # Source root
+      --help, -h # Print this help
+    """.trim()
+
+  # Application.validate_args rejects positional arguments.
+  # @param invocation cli.Invocation parsed command invocation.
+  # @return cli.Result? failure result when invalid.
+  validate_args: invocation ->
+    for arg in invocation.args
+      if not arg.starts_with("-")
+        return cli.Result.failure(
+          "ERROR: \"flakewatch\" was called with arguments \"{arg}\""
+        )
+    nil
+
+  # Application.write_history writes current run history when requested.
+  # @param options Dict normalized report options.
+  # @return Nil
+  write_history: options ->
+    if options["history_output"] == ""
+      return nil
+    history_options = options
+    history_options["output"] = options["history_output"]
+    History().export_file(history_options)
