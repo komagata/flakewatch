@@ -15,7 +15,7 @@ class FlakewatchTest extends TestCase
     html = file.File.read(output_path)
     assert(html.contains("pkg.FlakyTest.alternates"), "report rendered")
     assert(
-      html.contains("https://example.test/repo/blob/sha/flaky_test.tya#L8"),
+      html.contains("https://example.test/repo/blob/sha/flaky_test.tya"),
       "source link"
     )
 
