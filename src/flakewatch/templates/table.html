@@ -1,0 +1,74 @@
+<table>
+  <thead>
+    <tr>
+      <th class="test-col" data-sort="text">Test</th>
+      {{ if flaky }}
+        <th class="num" data-sort="number">Score</th>
+        <th class="num" data-sort="number">Obs</th>
+        <th class="num" data-sort="number">Pass</th>
+        <th class="num" data-sort="number">Fail</th>
+        <th class="num" data-sort="number">Error</th>
+        <th class="num" data-sort="number">Transitions</th>
+        <th class="status" data-sort="text">Last</th>
+      {{ end }}
+      {{ if healed }}
+        <th class="num" data-sort="number">Score</th>
+        <th class="num" data-sort="number">Obs</th>
+        <th class="num" data-sort="number">Pass</th>
+        <th class="num" data-sort="number">Fail</th>
+        <th class="num" data-sort="number">Error</th>
+        <th class="status" data-sort="text">Recent</th>
+      {{ end }}
+      {{ if failing }}
+        <th class="num" data-sort="number">Failures</th>
+        <th class="num" data-sort="number">Fail</th>
+        <th class="num" data-sort="number">Error</th>
+        <th class="num" data-sort="number">Obs</th>
+        <th class="status" data-sort="text">Last</th>
+      {{ end }}
+      {{ if slow }}
+        <th class="num" data-sort="number">Max seconds</th>
+        <th class="num" data-sort="number">Avg seconds</th>
+        <th class="num" data-sort="number">Obs</th>
+        <th class="status" data-sort="text">Last</th>
+      {{ end }}
+    </tr>
+  </thead>
+  <tbody>
+    {{ for row in rows }}
+      <tr>
+        <td class="test-col">{{ if row.test_link() }}<a href="{{ row.test_href() }}">{{ row.name }}</a>{{ else }}{{ row.name }}{{ end }}</td>
+        {{ if flaky }}
+          <td class="num">{{ row.flake_score }}</td>
+          <td class="num">{{ row.observations }}</td>
+          <td class="num">{{ row.pass_count }}</td>
+          <td class="num">{{ row.fail_count }}</td>
+          <td class="num">{{ row.error_count }}</td>
+          <td class="num">{{ row.transition_count }}</td>
+          <td class="status">{{ row.last_status }}</td>
+        {{ end }}
+        {{ if healed }}
+          <td class="num">{{ row.healed_score }}</td>
+          <td class="num">{{ row.observations }}</td>
+          <td class="num">{{ row.pass_count }}</td>
+          <td class="num">{{ row.fail_count }}</td>
+          <td class="num">{{ row.error_count }}</td>
+          <td class="status">{{ row.recent_status }}</td>
+        {{ end }}
+        {{ if failing }}
+          <td class="num">{{ row.failure_count }}</td>
+          <td class="num">{{ row.fail_count }}</td>
+          <td class="num">{{ row.error_count }}</td>
+          <td class="num">{{ row.observations }}</td>
+          <td class="status">{{ row.last_status }}</td>
+        {{ end }}
+        {{ if slow }}
+          <td class="num">{{ row.max_duration }}</td>
+          <td class="num">{{ row.avg_duration }}</td>
+          <td class="num">{{ row.observations }}</td>
+          <td class="status">{{ row.last_status }}</td>
+        {{ end }}
+      </tr>
+    {{ end }}
+  </tbody>
+</table>

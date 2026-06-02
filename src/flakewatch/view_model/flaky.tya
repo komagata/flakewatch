@@ -1,0 +1,39 @@
+# Flaky stores one row for the Flaky Tests report section.
+class Flaky extends Row
+  # Flaky.error_count stores the number of errored observations.
+  # @type Int
+  error_count: 0
+
+  # Flaky.fail_count stores the number of failed observations.
+  # @type Int
+  fail_count: 0
+
+  # Flaky.flake_score stores the computed flaky-test score.
+  # @type Int
+  flake_score: 0
+
+  # Flaky.last_status stores the most recent JUnit status.
+  # @type String
+  last_status: ""
+
+  # Flaky.observations stores the total observation count.
+  # @type Int
+  observations: 0
+
+  # Flaky.pass_count stores the number of passed observations.
+  # @type Int
+  pass_count: 0
+
+  # Flaky.transition_count stores pass/fail state transition count.
+  # @type Int
+  transition_count: 0
+
+  initialize: row, source_base_url, source_root, source_cache, source_line_cache ->
+    super(row, source_base_url, source_root, source_cache, source_line_cache)
+    self.flake_score = row["flake_score"]
+    self.observations = row["observations"]
+    self.pass_count = row["pass_count"]
+    self.fail_count = row["fail_count"]
+    self.error_count = row["error_count"]
+    self.transition_count = row["transition_count"]
+    self.last_status = row["last_status"]

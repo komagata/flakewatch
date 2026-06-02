@@ -1,0 +1,29 @@
+# Failing stores one row for the Failing Tests report section.
+class Failing extends Row
+  # Failing.error_count stores the number of errored observations.
+  # @type Int
+  error_count: 0
+
+  # Failing.fail_count stores the number of failed observations.
+  # @type Int
+  fail_count: 0
+
+  # Failing.failure_count stores the total failed and errored observations.
+  # @type Int
+  failure_count: 0
+
+  # Failing.last_status stores the most recent JUnit status.
+  # @type String
+  last_status: ""
+
+  # Failing.observations stores the total observation count.
+  # @type Int
+  observations: 0
+
+  initialize: row, source_base_url, source_root, source_cache, source_line_cache ->
+    super(row, source_base_url, source_root, source_cache, source_line_cache)
+    self.failure_count = row["failure_count"]
+    self.fail_count = row["fail_count"]
+    self.error_count = row["error_count"]
+    self.observations = row["observations"]
+    self.last_status = row["last_status"]

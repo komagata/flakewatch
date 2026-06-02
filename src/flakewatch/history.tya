@@ -34,31 +34,11 @@ class History
       if pattern.contains("**/*.jsonl")
         base = pattern.split("**/*.jsonl")[0]
         if base.ends_with("/")
-          base = slice(base, 0, base.byte_len() - 1)
+          base = base.slice(0, base.byte_len() - 1)
         collect_jsonl(base, out)
       elseif file.File.exists?(pattern)
         out.push(pattern)
     out.sort()
-
-  has_unsafe_json_chars: line ->
-    if line.contains("&")
-      return true
-    if line.byte_len() != line.len()
-      return true
-    i = 0
-    while i < line.byte_len()
-      if is_numeric_apostrophe_entity(line, i)
-        return true
-      i = i + 1
-    false
-
-  is_numeric_apostrophe_entity: line, i ->
-    if i + 4 >= line.byte_len()
-      return false
-    line[i] == "&"
-      and line[i + 2] == "3"
-      and line[i + 3] == "9"
-      and line[i + 4] == ";"
 
   items_from_jsonl: patterns ->
     out = []
@@ -66,7 +46,7 @@ class History
       text = file.File.read(path_name)
       for line in text.split("\n")
         if line != ""
-          if not has_unsafe_json_chars(line)
+          if not unsafe_json_chars?(line)
             out.push(json.Json.parse(line))
     out
 
@@ -77,6 +57,14 @@ class History
         record = record(opts, path_name, item)
         out.push(record)
     out
+
+  numeric_apostrophe_entity?: line, i ->
+    if i + 4 >= line.byte_len()
+      return false
+    line[i] == "&"
+      and line[i + 2] == "3"
+      and line[i + 3] == "9"
+      and line[i + 4] == ";"
 
   record: opts, junit_path, item ->
     out =
@@ -100,10 +88,14 @@ class History
       message: item["message"]
     out
 
-  slice: text, start, finish ->
-    out = ""
-    i = start
-    while i < finish
-      out = out + text[i]
+  unsafe_json_chars?: line ->
+    if line.contains("&")
+      return true
+    if line.byte_len() != line.len()
+      return true
+    i = 0
+    while i < line.byte_len()
+      if numeric_apostrophe_entity?(line, i)
+        return true
       i = i + 1
-    out
+    false

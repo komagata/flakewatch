@@ -51,29 +51,6 @@ class JUnit
       system_err: stderr
     out
 
-  digit_value: ch ->
-    if ch == "0"
-      return 0.0
-    if ch == "1"
-      return 1.0
-    if ch == "2"
-      return 2.0
-    if ch == "3"
-      return 3.0
-    if ch == "4"
-      return 4.0
-    if ch == "5"
-      return 5.0
-    if ch == "6"
-      return 6.0
-    if ch == "7"
-      return 7.0
-    if ch == "8"
-      return 8.0
-    if ch == "9"
-      return 9.0
-    -1.0
-
   files: patterns -> path_finder.files(patterns)
 
   parse: text ->
@@ -86,25 +63,7 @@ class JUnit
         parse_suite(child_suite, cases)
     cases
 
-  parse_duration: text ->
-    value = 0.0
-    fraction = 0.1
-    seen_dot = false
-    i = 0
-    while i < text.byte_len()
-      ch = text[i]
-      if ch == "."
-        seen_dot = true
-      else
-        digit = digit_value(ch)
-        if digit >= 0
-          if seen_dot
-            value = value + digit * fraction
-            fraction = fraction / 10.0
-          else
-            value = value * 10.0 + digit
-      i = i + 1
-    value
+  parse_duration: text -> text.to_f()
 
   parse_file: path_name -> parse(file.File.read(path_name))
 
@@ -131,16 +90,8 @@ class JUnitPathFinder
       if pattern.contains("**/*.xml")
         base = pattern.split("**/*.xml")[0]
         if base.ends_with("/")
-          base = slice(base, 0, base.byte_len() - 1)
+          base = base.slice(0, base.byte_len() - 1)
         collect_xml(base, out)
       else
         out.push(pattern)
     out.sort()
-
-  slice: text, start, finish ->
-    out = ""
-    i = start
-    while i < finish
-      out = out + text[i]
-      i = i + 1
-    out

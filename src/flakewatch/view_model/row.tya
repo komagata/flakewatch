@@ -1,0 +1,37 @@
+# Row stores fields and behavior shared by report table view models.
+class Row
+  # Row.name stores the full test name shown in the first column.
+  # @type String
+  name: ""
+
+  # Row.row stores the source aggregate data used to build this view model.
+  row: nil
+
+  # Row.source_base_url stores the repository URL prefix for source links.
+  # @type String
+  source_base_url: ""
+
+  # Row.source_cache stores source file contents keyed by path.
+  source_cache: nil
+
+  # Row.source_line_cache stores resolved line numbers keyed by path and test name.
+  source_line_cache: nil
+
+  # Row.source_root stores the local source root used for line lookup.
+  # @type String
+  source_root: "."
+
+  initialize: row, source_base_url, source_root, source_cache, source_line_cache ->
+    self.row = row
+    self.source_base_url = source_base_url
+    self.source_root = source_root
+    self.source_cache = source_cache
+    self.source_line_cache = source_line_cache
+    self.name = row["name"]
+
+  test_href: -> test_link_value().href
+
+  test_link: -> test_link_value().link
+
+  test_link_value: ->
+    TestLink(row, source_base_url, source_root, source_cache, source_line_cache)

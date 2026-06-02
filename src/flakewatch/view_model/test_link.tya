@@ -1,0 +1,68 @@
+import file
+
+# TestLink resolves source links for report row test names.
+class TestLink
+  href: ""
+
+  link: false
+
+  initialize: row, source_base_url, source_root, source_cache, source_line_cache ->
+    if source_base_url == "" or row["file"] == ""
+      return nil
+    self.href = source_base_url + "/" + row["file"]
+    line = source_line(
+      source_root,
+      source_cache,
+      source_line_cache,
+      row["file"],
+      row["line"],
+      row["test_name"]
+    )
+    if line != ""
+      self.href = href + "#L" + line
+    self.link = true
+
+  source_line: source_root, source_cache, source_line_cache, relative_path, line, test_name ->
+    if line != ""
+      return "{line}"
+    if relative_path == ""
+      return ""
+    source_path = relative_path
+    if source_root != "" and source_root != "."
+      source_path = source_root + "/" + relative_path
+    cache_key = source_path + "\n" + test_name
+    if source_line_cache[cache_key] != nil
+      return source_line_cache[cache_key]
+    if source_cache[source_path] == nil
+      if file.File.exists?(source_path)
+        source_cache[source_path] = file.File.read(source_path).split("\n")
+      else
+        source_cache[source_path] = []
+    lines = source_cache[source_path]
+    if lines.len() == 0
+      source_line_cache[cache_key] = ""
+      return ""
+    candidates = test_line_candidates(test_name)
+    i = 0
+    while i < lines.len()
+      for candidate in candidates
+        if candidate != "" and lines[i].contains(candidate)
+          line_number = i + 1
+          found = "{line_number}"
+          source_line_cache[cache_key] = found
+          return found
+      i = i + 1
+    source_line_cache[cache_key] = ""
+    ""
+
+  test_line_candidates: test_name ->
+    candidates = []
+    candidates.push("def " + test_name)
+    if test_name.starts_with("test_")
+      name = test_name.slice(5, test_name.len())
+      candidates.push("test \"" + name + "\"")
+      candidates.push("test '" + name + "'")
+      words = name.replace("_", " ")
+      candidates.push("test \"" + words + "\"")
+      candidates.push("test '" + words + "'")
+    candidates

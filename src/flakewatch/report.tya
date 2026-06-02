@@ -1,5 +1,6 @@
 import file
 import template
+import flakewatch/view_model/* as *
 
 class Report
   history: nil
@@ -10,11 +11,20 @@ class Report
     self.history = History()
     self.junit = JUnit()
 
-  cell: klass, value ->
-    html = template
-      .Template(template_tag("value"))
-      .render({ value: value }, { escape: "html" })
-    { class: klass, html: html.trim() }
+  build_rows: rows, filter_field, row_class, link_context ->
+    data_rows = []
+    for row in rows
+      if filter_field == "" or row[filter_field] > 0
+        data_rows.push(
+          row_class(
+            row,
+            link_context["source_base_url"],
+            link_context["source_root"],
+            link_context["source_cache"],
+            link_context["source_line_cache"]
+          )
+        )
+    data_rows
 
   combined_items: history_patterns, junit_patterns ->
     out = []
@@ -24,93 +34,10 @@ class Report
       out.push(item)
     out
 
-  failing_rows: rows, source_base_url, source_root, source_cache, source_line_cache ->
-    data_rows = []
-    for row in rows
-      if row["failure_count"] > 0
-        data_rows.push(
-          {
-            cells: [
-              test_cell(
-                row,
-                source_base_url,
-                source_root,
-                source_cache,
-                source_line_cache
-              ),
-              cell("num", text(row["failure_count"])),
-              cell("num", text(row["fail_count"])),
-              cell("num", text(row["error_count"])),
-              cell("num", text(row["observations"])),
-              cell("status", row["last_status"])
-            ]
-          }
-        )
-    data_rows
-
-  flaky_rows: rows, source_base_url, source_root, source_cache, source_line_cache ->
-    data_rows = []
-    for row in rows
-      if row["flake_score"] > 0
-        data_rows.push(
-          {
-            cells: [
-              test_cell(
-                row,
-                source_base_url,
-                source_root,
-                source_cache,
-                source_line_cache
-              ),
-              cell("num", text(row["flake_score"])),
-              cell("num", text(row["observations"])),
-              cell("num", text(row["pass_count"])),
-              cell("num", text(row["fail_count"])),
-              cell("num", text(row["error_count"])),
-              cell("num", text(row["transition_count"])),
-              cell("status", row["last_status"])
-            ]
-          }
-        )
-    data_rows
-
-  healed_rows: rows, source_base_url, source_root, source_cache, source_line_cache ->
-    data_rows = []
-    for row in rows
-      if row["healed_score"] > 0
-        data_rows.push(
-          {
-            cells: [
-              test_cell(
-                row,
-                source_base_url,
-                source_root,
-                source_cache,
-                source_line_cache
-              ),
-              cell("num", text(row["healed_score"])),
-              cell("num", text(row["observations"])),
-              cell("num", text(row["pass_count"])),
-              cell("num", text(row["fail_count"])),
-              cell("num", text(row["error_count"])),
-              cell("status", "10 passed")
-            ]
-          }
-        )
-    data_rows
-
   history_items: patterns ->
     if patterns.len() == 0
       return []
     history.items_from_jsonl(patterns)
-
-  html: opts ->
-    opts["history"] ??= []
-    opts["junit"] ??= []
-    opts["source_base_url"] ??= ""
-    opts["source_root"] ??= "."
-    rows = rows_from_items(combined_items(opts["history"], opts["junit"]))
-    render_rows(rows, opts["source_base_url"], opts["source_root"])
 
   junit_items: patterns ->
     items = []
@@ -132,11 +59,13 @@ class Report
       sources.push(source)
     top_sources(sources)
 
-  link_cell: klass, label, href ->
-    html = template
-      .Template(template_path("link.html"))
-      .render_file({ href: href, label: label }, { escape: "html" })
-    { class: klass, html: html.trim() }
+  link_context: source_base_url, source_root, source_cache, source_line_cache ->
+    context =
+      source_base_url: source_base_url
+      source_root: source_root
+      source_cache: source_cache
+      source_line_cache: source_line_cache
+    context
 
   recent_all_passed: statuses, limit ->
     if statuses.len() < limit
@@ -148,8 +77,16 @@ class Report
       i = i + 1
     true
 
+  render: opts ->
+    opts["history"] ??= []
+    opts["junit"] ??= []
+    opts["source_base_url"] ??= ""
+    opts["source_root"] ??= "."
+    rows = rows_from_items(combined_items(opts["history"], opts["junit"]))
+    render_rows(rows, opts["source_base_url"], opts["source_root"])
+
   render_file: opts ->
-    html = html(opts)
+    html = render(opts)
     file.File.write(opts["output"], html)
     println("wrote " + opts["output"])
 
@@ -262,61 +199,6 @@ class Report
         count = count + 1
     count
 
-  slow_rows: rows, source_base_url, source_root, source_cache, source_line_cache ->
-    data_rows = []
-    for row in rows
-      data_rows.push(
-        {
-          cells: [
-            test_cell(
-              row,
-              source_base_url,
-              source_root,
-              source_cache,
-              source_line_cache
-            ),
-            cell("num", text(row["max_duration"])),
-            cell("num", text(row["avg_duration"])),
-            cell("num", text(row["observations"])),
-            cell("status", row["last_status"])
-          ]
-        }
-      )
-    data_rows
-
-  source_line: source_root, source_cache, source_line_cache, relative_path, line, test_name ->
-    if line != ""
-      return text(line)
-    if relative_path == ""
-      return ""
-    source_path = relative_path
-    if source_root != "" and source_root != "."
-      source_path = source_root + "/" + relative_path
-    cache_key = source_path + "\n" + test_name
-    if source_line_cache[cache_key] != nil
-      return source_line_cache[cache_key]
-    if source_cache[source_path] == nil
-      if file.File.exists?(source_path)
-        source_cache[source_path] = file.File.read(source_path).split("\n")
-      else
-        source_cache[source_path] = []
-    lines = source_cache[source_path]
-    if lines.len() == 0
-      source_line_cache[cache_key] = ""
-      return ""
-    candidates = test_line_candidates(test_name)
-    i = 0
-    while i < lines.len()
-      for candidate in candidates
-        if candidate != "" and lines[i].contains(candidate)
-          line_number = i + 1
-          found = text(line_number)
-          source_line_cache[cache_key] = found
-          return found
-      i = i + 1
-    source_line_cache[cache_key] = ""
-    ""
-
   template_data: rows, source_base_url, source_root, source_cache, source_line_cache ->
     source_cache = {}
     source_line_cache = {}
@@ -328,6 +210,12 @@ class Report
       observations = observations + row["observations"]
       failures = failures + row["fail_count"] + row["error_count"]
     slow_tests = slow_count(rows)
+    links = link_context(
+      source_base_url,
+      source_root,
+      source_cache,
+      source_line_cache
+    )
     data =
       metrics: [
         {
@@ -351,48 +239,44 @@ class Report
         section(
           "flaky",
           "Flaky Tests",
-          flaky_rows(
+          build_rows(
             top_rows(rows, "flake_score", 20),
-            source_base_url,
-            source_root,
-            source_cache,
-            source_line_cache
+            "flake_score",
+            Flaky,
+            links
           ),
           "No flaky tests detected in these JUnit files."
         ),
         section(
           "healed",
           "Healed Candidates",
-          healed_rows(
+          build_rows(
             top_rows(rows, "healed_score", 20),
-            source_base_url,
-            source_root,
-            source_cache,
-            source_line_cache
+            "healed_score",
+            Healed,
+            links
           ),
           "No healed candidates detected. A test must have past pass/fail variation and 10 most recent passing observations."
         ),
         section(
           "failing",
           "Failing Tests",
-          failing_rows(
+          build_rows(
             top_rows(rows, "failure_count", 20),
-            source_base_url,
-            source_root,
-            source_cache,
-            source_line_cache
+            "failure_count",
+            Failing,
+            links
           ),
           "No failing tests found in these JUnit files."
         ),
         section(
           "slow",
           "Slow Tests",
-          slow_rows(
+          build_rows(
             top_rows(rows, "max_duration", 20),
-            source_base_url,
-            source_root,
-            source_cache,
-            source_line_cache
+            "",
+            Slow,
+            links
           ),
           "No tests found in these JUnit files."
         )
@@ -400,42 +284,6 @@ class Report
     data
 
   template_path: name -> "src/flakewatch/templates/" + name
-
-  template_tag: name ->
-    template.Template(nil).open()
-      + " "
-      + name
-      + " "
-      + template.Template(nil).close()
-
-  test_cell: row, source_base_url, source_root, source_cache, source_line_cache ->
-    label = row["name"]
-    if source_base_url == "" or row["file"] == ""
-      return cell("test-col", label)
-    href = source_base_url + "/" + row["file"]
-    line = self.source_line(
-      source_root,
-      source_cache,
-      source_line_cache,
-      row["file"],
-      row["line"],
-      row["test_name"]
-    )
-    if line != ""
-      href = href + "#L" + line
-    link_cell("test-col", label, href)
-
-  test_line_candidates: test_name ->
-    candidates = []
-    candidates.push("def " + test_name)
-    if test_name.starts_with("test_")
-      name = test_name.slice(5, test_name.len())
-      candidates.push("test \"" + name + "\"")
-      candidates.push("test '" + name + "'")
-      words = name.replace("_", " ")
-      candidates.push("test \"" + words + "\"")
-      candidates.push("test '" + words + "'")
-    candidates
 
   text: value -> "{value}"
 

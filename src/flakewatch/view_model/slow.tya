@@ -1,0 +1,24 @@
+# Slow stores one row for the Slow Tests report section.
+class Slow extends Row
+  # Slow.avg_duration stores the average observed duration in seconds.
+  # @type Float
+  avg_duration: 0.0
+
+  # Slow.last_status stores the most recent JUnit status.
+  # @type String
+  last_status: ""
+
+  # Slow.max_duration stores the maximum observed duration in seconds.
+  # @type Float
+  max_duration: 0.0
+
+  # Slow.observations stores the total observation count.
+  # @type Int
+  observations: 0
+
+  initialize: row, source_base_url, source_root, source_cache, source_line_cache ->
+    super(row, source_base_url, source_root, source_cache, source_line_cache)
+    self.max_duration = row["max_duration"]
+    self.avg_duration = row["avg_duration"]
+    self.observations = row["observations"]
+    self.last_status = row["last_status"]

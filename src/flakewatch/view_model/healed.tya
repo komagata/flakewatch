@@ -1,0 +1,34 @@
+# Healed stores one row for the Healed Candidates report section.
+class Healed extends Row
+  # Healed.error_count stores the number of errored observations.
+  # @type Int
+  error_count: 0
+
+  # Healed.fail_count stores the number of failed observations.
+  # @type Int
+  fail_count: 0
+
+  # Healed.healed_score stores the previous flaky-test score.
+  # @type Int
+  healed_score: 0
+
+  # Healed.observations stores the total observation count.
+  # @type Int
+  observations: 0
+
+  # Healed.pass_count stores the number of passed observations.
+  # @type Int
+  pass_count: 0
+
+  # Healed.recent_status stores the recent passing status label.
+  # @type String
+  recent_status: ""
+
+  initialize: row, source_base_url, source_root, source_cache, source_line_cache ->
+    super(row, source_base_url, source_root, source_cache, source_line_cache)
+    self.healed_score = row["healed_score"]
+    self.observations = row["observations"]
+    self.pass_count = row["pass_count"]
+    self.fail_count = row["fail_count"]
+    self.error_count = row["error_count"]
+    self.recent_status = "10 passed"

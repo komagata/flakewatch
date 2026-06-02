@@ -124,52 +124,7 @@
   {{ for section in sections }}
     <h2>{{ section.title }}</h2>
     {{ if section.has_rows }}
-      <table>
-        <thead>
-          <tr>
-            <th class="test-col" data-sort="text">Test</th>
-            {{ if section.flaky }}
-              <th class="num" data-sort="number">Score</th>
-              <th class="num" data-sort="number">Obs</th>
-              <th class="num" data-sort="number">Pass</th>
-              <th class="num" data-sort="number">Fail</th>
-              <th class="num" data-sort="number">Error</th>
-              <th class="num" data-sort="number">Transitions</th>
-              <th class="status" data-sort="text">Last</th>
-            {{ end }}
-            {{ if section.healed }}
-              <th class="num" data-sort="number">Score</th>
-              <th class="num" data-sort="number">Obs</th>
-              <th class="num" data-sort="number">Pass</th>
-              <th class="num" data-sort="number">Fail</th>
-              <th class="num" data-sort="number">Error</th>
-              <th class="status" data-sort="text">Recent</th>
-            {{ end }}
-            {{ if section.failing }}
-              <th class="num" data-sort="number">Failures</th>
-              <th class="num" data-sort="number">Fail</th>
-              <th class="num" data-sort="number">Error</th>
-              <th class="num" data-sort="number">Obs</th>
-              <th class="status" data-sort="text">Last</th>
-            {{ end }}
-            {{ if section.slow }}
-              <th class="num" data-sort="number">Max seconds</th>
-              <th class="num" data-sort="number">Avg seconds</th>
-              <th class="num" data-sort="number">Obs</th>
-              <th class="status" data-sort="text">Last</th>
-            {{ end }}
-          </tr>
-        </thead>
-        <tbody>
-          {{ for row in section.rows }}
-            <tr>
-              {{ for cell in row.cells }}
-                <td class="{{ cell.class }}">{{{ cell.html }}}</td>
-              {{ end }}
-            </tr>
-          {{ end }}
-        </tbody>
-      </table>
+      {{ partial "table.html" section }}
     {{ else }}
       <div class="empty">{{ section.empty_message }}</div>
     {{ end }}
