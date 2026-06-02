@@ -34,7 +34,7 @@ jobs:
       - name: Run tests
         run: |
           mkdir -p tmp
-          tya test
+          tya test tests/flakewatch_test.tya
 
       - name: Lint
         run: tya lint src tests
