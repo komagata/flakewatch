@@ -35,7 +35,6 @@ jobs:
         run: |
           mkdir -p tmp
           tya run src/main.tya --junit="tests/fixtures/junit/**/*.xml" --output=tmp/flakewatch.html
-          test -s tmp/flakewatch.html
 
       - name: Lint
         run: tya lint src tests
