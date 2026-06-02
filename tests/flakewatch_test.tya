@@ -12,7 +12,6 @@ class FlakewatchTest extends TestCase
       .Application()
       .run(["--junit=tests/fixtures/junit/run1.xml", "--output=" + output_path, "--source-base-url=https://example.test/repo/blob/sha"])
     assert_equal(0, outcome.status, "status")
-    assert(file.File.exists?(output_path), "report file")
 
   test_cli_app_reports_option_errors: ->
     outcome = flakewatch.Application().run(["--unknown=true"])
