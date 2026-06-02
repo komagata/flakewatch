@@ -94,7 +94,7 @@ jobs:
 
       - name: Generate flakewatch report
         if: always()
-        uses: komagata/flakewatch@v0.6.17
+        uses: komagata/flakewatch@v0.6.18
 ```
 
 By default, the action:
@@ -153,16 +153,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: komagata/flakewatch@v0.6.17
+      - uses: komagata/flakewatch@v0.6.18
         with:
-          download-artifacts: true
-          download-artifact-pattern: junit-*
-          junit: "test-results/**/*.xml"
+          junit-artifact-pattern: junit-*
 ```
 
-Flakewatch reads all downloaded XML files in stable path order. If JUnit XML
-contains `testsuite timestamp` values, the report uses timestamp plus path order
-for observation ordering.
+When `junit-artifact-pattern` is set, Flakewatch downloads matching artifacts
+into `test-results` and reads `test-results/**/*.xml`. It reads XML files in
+stable path order. If JUnit XML contains `testsuite timestamp` values, the
+report uses timestamp plus path order for observation ordering.
 
 ### Persistent History
 
@@ -177,7 +176,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.17
+  uses: komagata/flakewatch@v0.6.18
   with:
     history-branch: flakewatch-data
 ```
@@ -203,7 +202,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.17
+  uses: komagata/flakewatch@v0.6.18
   with:
     history-branch: flakewatch-data
     history-write: true
@@ -221,11 +220,12 @@ visible in the job log.
 | `output` | `flakewatch.html` | HTML report output path. |
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
-| `version` | `v0.6.17` | Flakewatch release version to install. |
+| `version` | `v0.6.18` | Flakewatch release version to install. |
 | `upload-artifact` | `true` | Upload the generated HTML report as a GitHub Actions artifact. |
 | `artifact-name` | `flakewatch.html` | GitHub Actions artifact name for the generated HTML report. |
+| `junit-artifact-pattern` | empty | JUnit XML artifact name pattern to download, for example `junit-*`. When set, Flakewatch reads `download-artifact-path/**/*.xml`. |
 | `download-artifacts` | `false` | Download JUnit XML artifacts before generating the report. Use this in a fan-in job after matrix test jobs upload XML artifacts. |
-| `download-artifact-pattern` | empty | Artifact name pattern to download, for example `junit-*`. When empty, all artifacts are downloaded. |
+| `download-artifact-pattern` | empty | Lower-level artifact name pattern used with `download-artifacts: true`. Prefer `junit-artifact-pattern` for JUnit fan-in. |
 | `download-artifact-path` | `test-results` | Destination directory for downloaded JUnit XML artifacts. |
 | `merge-artifacts` | `true` | Merge downloaded artifacts into `download-artifact-path`. |
 | `update-pr-description` | `true` | Add or update a Flakewatch report link in the pull request description. |
