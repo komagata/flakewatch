@@ -36,5 +36,3 @@ if [ -w "$INSTALL_DIR" ]; then
 else
   sudo install "$TMP_DIR/flakewatch" "$INSTALL_DIR/flakewatch"
 fi
-
-"$INSTALL_DIR/flakewatch" --help >/dev/null
