@@ -90,7 +90,7 @@ class FlakewatchTest extends TestCase
   test_html_report_renders_flaky_and_slow_tests_without_database: ->
     html = flakewatch
       .Report()
-      .render({ junit: ["tests/fixtures/junit/**/*.xml"] })
+      .render({ junit: ["tests/fixtures/junit/run1.xml", "tests/fixtures/junit/run2.xml", "tests/fixtures/junit/no_time.xml", "tests/fixtures/junit/healed.xml", "tests/fixtures/junit/single_quote.xml"] })
     assert(html.contains("<h2>Flaky Tests</h2>"), "flaky section")
     assert(html.contains("<h2>Healed Candidates</h2>"), "healed section")
     assert(html.contains("<h2>Failing Tests</h2>"), "failing section")
@@ -174,6 +174,37 @@ class FlakewatchTest extends TestCase
     assert_equal("stderr text", one[1]["system_err"], "stderr")
     assert_equal("skipped", one[2]["status"], "skipped")
     assert_equal("error", two[2]["status"], "error")
+
+  test_junit_parse_unicode_test_names: ->
+    cases = flakewatch
+      .JUnit()
+      .parse_file("tests/fixtures/junit/unicode_name.xml")
+    assert_equal(2, cases.len(), "case count")
+    assert_equal(
+      "test_日報作成者がコメントをした際、ウォッチ通知が飛ばないバグの再現",
+      cases[0]["name"],
+      "first name"
+    )
+    assert_equal(
+      "test_質問作成者がコメントをした際、ウォッチ通知が飛ばないバグの再現",
+      cases[1]["name"],
+      "second name"
+    )
+    html = flakewatch
+      .Report()
+      .render({ junit: ["tests/fixtures/junit/unicode_name.xml"] })
+    assert(
+      html.contains(
+        "Notification::WatchesTest.test_日報作成者がコメントをした際、ウォッチ通知が飛ばないバグの再現"
+      ),
+      "first name in report"
+    )
+    assert(
+      html.contains(
+        "Notification::WatchesTest.test_質問作成者がコメントをした際、ウォッチ通知が飛ばないバグの再現"
+      ),
+      "second name in report"
+    )
 
   test_root_help_uses_tya_cli_application: ->
     outcome = flakewatch.Application().run([])

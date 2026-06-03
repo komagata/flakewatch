@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.20
+    default: v0.6.21
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -138,13 +138,6 @@ runs:
         junit_pattern="${{ inputs.junit }}"
         if [ -n "${{ inputs.junit-artifact-pattern }}" ]; then
           junit_pattern="${{ inputs.download-artifact-path }}/**/*.xml"
-        fi
-
-        if [[ "$junit_pattern" == *"**/*.xml" ]]; then
-          junit_root="$junit_pattern"
-          junit_root="${junit_root%%/**/*.xml}"
-          find "$junit_root" -name '*.xml' -type f -print0 |
-            xargs -0 -r perl -CS -i -pe 's/([^\x00-\x7F])/sprintf("&#x%04x;", ord($1))/ge'
         fi
 
         if [ -n "${{ inputs['source-base-url'] }}" ]; then

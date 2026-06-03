@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite time="12.315376" skipped="0" failures="0" errors="0" name="Notification::WatchesTest" assertions="7" tests="2" timestamp="2026-06-03T14:09:23+09:00">
+  <testcase time="9.443355" file="test/system/notification/watches_test.rb" name="test_日報作成者がコメントをした際、ウォッチ通知が飛ばないバグの再現" assertions="4">
+  </testcase>
+  <testcase time="2.872021" file="test/system/notification/watches_test.rb" name="test_質問作成者がコメントをした際、ウォッチ通知が飛ばないバグの再現" assertions="3">
+  </testcase>
+</testsuite>
