@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.23
+    default: v0.6.24
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -166,8 +166,10 @@ runs:
           fi
         fi
 
-        flakewatch_status=0
-        flakewatch "${args[@]}" || flakewatch_status=$?
+        set +e
+        flakewatch "${args[@]}"
+        flakewatch_status=$?
+        set -e
         test -s "${{ inputs.output }}"
         if [ "$flakewatch_status" -ne 0 ]; then
           echo "::warning::flakewatch exited with status ${flakewatch_status}, but generated '${{ inputs.output }}'."
