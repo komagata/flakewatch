@@ -1,7 +1,6 @@
 import dir
 import file
 import path
-import xml/* as xml
 
 class JUnit
   path_finder: nil
@@ -55,23 +54,97 @@ class JUnit
 
   parse: text ->
     cases = []
-    root = xml.Xml.parse(text).root()
-    if root.name == "testsuite"
-      parse_suite(root, cases)
-    else
-      for child_suite in root.find_all("testsuite")
-        parse_suite(child_suite, cases)
+    for suite_part in text.split("<testsuite")
+      if suite_part.contains("<testcase")
+        parse_suite_text(suite_part, cases)
     cases
 
   parse_duration: text -> text.to_f()
 
   parse_file: path_name -> parse(file.File.read(path_name))
 
-  parse_suite: suite, cases ->
-    suite_name = suite.attr("name", "")
-    suite_timestamp = suite.attr("timestamp", "")
-    for item in suite.find_all("testcase")
-      cases.push(case_from(suite_name, suite_timestamp, item))
+  parse_suite_text: suite_text, cases ->
+    suite_header = suite_text.split(">")[0]
+    suite_name = attr(suite_header, "name")
+    suite_timestamp = attr(suite_header, "timestamp")
+    parts = suite_text.split("<testcase")
+    i = 1
+    while i < parts.len()
+      item = case_from_text(suite_name, suite_timestamp, parts[i])
+      if item != nil
+        cases.push(item)
+      i = i + 1
+
+  case_from_text: suite_name, suite_timestamp, text ->
+    header = text.split(">")[0]
+    status = "passed"
+    message = ""
+    body = ""
+    if text.contains("<failure")
+      status = "failed"
+      failure_text = text.split("<failure")[1]
+      message = attr(failure_text.split(">")[0], "message")
+      body = element_text(failure_text)
+    if text.contains("<error")
+      status = "error"
+      error_text = text.split("<error")[1]
+      message = attr(error_text.split(">")[0], "message")
+      body = element_text(error_text)
+    if text.contains("<skipped") and status == "passed"
+      status = "skipped"
+      skipped_text = text.split("<skipped")[1]
+      message = attr(skipped_text.split(">")[0], "message")
+      body = element_text(skipped_text)
+    out =
+      suite: suite_name
+      timestamp: suite_timestamp
+      classname: attr(header, "classname")
+      name: attr(header, "name")
+      file: attr(header, "file")
+      line: attr(header, "line")
+      duration: parse_duration(attr_with_default(header, "time", "0"))
+      status: status
+      message: message
+      body: body
+      system_out: element_named_text(text, "system-out")
+      system_err: element_named_text(text, "system-err")
+    out
+
+  attr: text, name -> attr_with_default(text, name, "")
+
+  attr_with_default: text, name, default_value ->
+    marker = " " + name + "=\""
+    if text.contains(marker)
+      return unescape_xml(text.split(marker)[1].split("\"")[0])
+    marker = " " + name + "='"
+    if text.contains(marker)
+      return unescape_xml(text.split(marker)[1].split("'")[0])
+    default_value
+
+  element_named_text: text, name ->
+    marker = "<" + name
+    if not text.contains(marker)
+      return ""
+    element_text(text.split(marker)[1])
+
+  element_text: text ->
+    if text.contains("<![CDATA[") and text.contains("]]>")
+      return text.split("<![CDATA[")[1].split("]]>")[0]
+    if not text.contains(">")
+      return ""
+    rest = text.split(">")[1]
+    if not rest.contains("</")
+      return ""
+    value = rest.split("</")[0]
+    unescape_xml(value)
+
+  unescape_xml: text ->
+    text
+      .replace("&quot;", "\"")
+      .replace("&apos;", "'")
+      .replace("&lt;", "<")
+      .replace("&gt;", ">")
+      .replace("&amp;", "&")
 
 class JUnitPathFinder
   collect_xml: root, out ->

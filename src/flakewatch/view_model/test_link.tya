@@ -24,7 +24,7 @@ class TestLink
 
   source_line: source_root, source_cache, source_line_cache, relative_path, line, test_name ->
     if line != ""
-      return "{line}"
+      return line
     if relative_path == ""
       return ""
     source_path = relative_path
@@ -48,7 +48,7 @@ class TestLink
       for candidate in candidates
         if candidate != "" and lines[i].contains(candidate)
           line_number = i + 1
-          found = "{line_number}"
+          found = line_number.to_string()
           source_line_cache[cache_key] = found
           return found
       i = i + 1
