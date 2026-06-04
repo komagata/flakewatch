@@ -94,7 +94,7 @@ jobs:
 
       - name: Generate flakewatch report
         if: always()
-        uses: komagata/flakewatch@v0.6.25
+        uses: komagata/flakewatch@v0.6.26
 ```
 
 By default, the action:
@@ -153,7 +153,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: komagata/flakewatch@v0.6.25
+      - uses: komagata/flakewatch@v0.6.26
         with:
           junit-artifact-pattern: junit-*
 ```
@@ -176,22 +176,22 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.25
+  uses: komagata/flakewatch@v0.6.26
   with:
     history-branch: flakewatch-data
 ```
 
-When `history-branch` is set, the action reads
-`history/**/*.jsonl` from that branch before generating the HTML report. It
-then writes the current run to a file such as:
+When `history-branch` is set, trusted branch runs read
+`history/**/*.jsonl` from that branch before generating the HTML report. They
+then write the current run to a file such as:
 
 ```text
 history/2026/05/18/run-123456789-attempt-1.jsonl
 ```
 
-The default `history-write: auto` writes history only outside
-`pull_request` events. This lets trusted branch runs update the history while
-pull request runs can still read it when permissions allow.
+The default `history-write: auto` reads and writes history only outside
+`pull_request` events. This keeps pull request workflows simple and avoids
+letting untrusted PR code read or update the persistent history branch.
 
 If you want pull request runs to write history too, opt in explicitly:
 
@@ -202,15 +202,15 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.25
+  uses: komagata/flakewatch@v0.6.26
   with:
     history-branch: flakewatch-data
     history-write: true
 ```
 
 With the default `history-write: auto`, pull request runs that set
-`history-branch` emit a GitHub Actions warning so the skipped history write is
-visible in the job log.
+`history-branch` emit a GitHub Actions notice so the skipped history read/write
+is visible in the job log.
 
 ### Action Inputs
 
@@ -220,7 +220,7 @@ visible in the job log.
 | `output` | `flakewatch.html` | HTML report output path. |
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
-| `version` | `v0.6.25` | Flakewatch release version to install. |
+| `version` | `v0.6.26` | Flakewatch release version to install. |
 | `upload-artifact` | `true` | Upload the generated HTML report as a GitHub Actions artifact. |
 | `artifact-name` | `flakewatch.html` | GitHub Actions artifact name for the generated HTML report. |
 | `junit-artifact-pattern` | empty | JUnit XML artifact name pattern to download, for example `junit-*`. When set, Flakewatch reads `download-artifact-path/**/*.xml`. |
@@ -231,7 +231,7 @@ visible in the job log.
 | `update-pr-description` | `true` | Add or update a Flakewatch report link in the pull request description. |
 | `add-job-summary` | `true` | Add a Flakewatch report link to the GitHub Actions job summary. |
 | `history-branch` | empty | Git branch used to persist JSONL test history. |
-| `history-write` | `auto` | Write JSONL history to `history-branch`. `auto` writes outside pull request events. |
+| `history-write` | `auto` | Write JSONL history to `history-branch`. `auto` reads and writes outside pull request events. |
 
 ## Command
 

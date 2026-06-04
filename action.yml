@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.25
+    default: v0.6.26
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -59,7 +59,7 @@ inputs:
     required: false
     default: "true"
   history-branch:
-    description: Git branch used to persist JSONL test history. Leave empty to disable persistent history.
+    description: Git branch used to persist JSONL test history. Leave empty to disable persistent history. With the default auto write mode, pull_request events skip history reads and writes.
     required: false
     default: ""
   history-write:
@@ -87,7 +87,7 @@ runs:
 
     - name: Checkout flakewatch history
       id: flakewatch-history
-      if: inputs.history-branch != ''
+      if: inputs.history-branch != '' && (inputs.history-write == 'true' || github.event_name != 'pull_request')
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -200,11 +200,11 @@ runs:
 
         git push origin "HEAD:${HISTORY_BRANCH}"
 
-    - name: Explain skipped flakewatch history write
+    - name: Explain skipped flakewatch history
       if: inputs.history-branch != '' && inputs.history-write == 'auto' && github.event_name == 'pull_request'
       shell: bash
       run: |
-        echo "::warning::Flakewatch read history from '${{ inputs.history-branch }}', but did not write this pull_request run because history-write defaults to auto. Set history-write: true and grant contents: write if you want pull request runs to persist history."
+        echo "::notice::Flakewatch skipped history read/write for this pull_request run because history-write defaults to auto. Trusted push runs will use '${{ inputs.history-branch }}'."
 
     - name: Upload flakewatch report
       id: upload-flakewatch-report
