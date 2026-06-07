@@ -47,7 +47,7 @@ class History
       for line in text.split("\n")
         if line != ""
           if not unsafe_json_chars?(line)
-            out.push(json.Json.parse(line))
+            out.push(record_from_jsonl(line))
     out
 
   items_from_junit: opts ->
@@ -57,6 +57,20 @@ class History
         record = record(opts, path_name, item)
         out.push(record)
     out
+
+  json_number: line, name ->
+    marker = "\"" + name + "\":"
+    if not line.contains(marker)
+      return 0.0
+    value = line.split(marker)[1].split(",")[0]
+    value.to_f()
+
+  json_string: line, name ->
+    marker = "\"" + name + "\":\""
+    if not line.contains(marker)
+      return ""
+    value = line.split(marker)[1].split("\"")[0]
+    unescape_json_string(value)
 
   numeric_apostrophe_entity?: line, i ->
     if i + 4 >= line.byte_len()
@@ -88,7 +102,40 @@ class History
       message: item["message"]
     out
 
+  record_from_jsonl: line ->
+    out =
+      repo: json_string(line, "repo")
+      workflow: json_string(line, "workflow")
+      run_id: json_string(line, "run_id")
+      run_attempt: json_string(line, "run_attempt")
+      job: json_string(line, "job")
+      sha: json_string(line, "sha")
+      branch: json_string(line, "branch")
+      event: json_string(line, "event")
+      junit_path: json_string(line, "junit_path")
+      suite: json_string(line, "suite")
+      timestamp: json_string(line, "timestamp")
+      classname: json_string(line, "classname")
+      name: json_string(line, "name")
+      file: json_string(line, "file")
+      line: json_string(line, "line")
+      duration: json_number(line, "duration")
+      status: json_string(line, "status")
+      message: json_string(line, "message")
+    out
+
+  unescape_json_string: text ->
+    text
+      .replace("\\\"", "\"")
+      .replace("\\\\", "\\")
+      .replace("\\/", "/")
+      .replace("\\n", "\n")
+      .replace("\\r", "\r")
+      .replace("\\t", "\t")
+
   unsafe_json_chars?: line ->
+    if line.contains("\\")
+      return true
     if line.contains("&")
       return true
     if line.byte_len() != line.len()

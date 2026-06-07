@@ -134,6 +134,20 @@ class FlakewatchTest extends TestCase
       "history creates flake signal"
     )
 
+  test_jsonl_history_reads_exported_record_fields: ->
+    history_path = "tmp/flakewatch-history-fields.jsonl"
+    if file.File.exists?(history_path)
+      file.File.remove(history_path)
+    flakewatch
+      .History()
+      .export_file({ output: history_path, junit: ["tests/fixtures/junit/run1.xml"], repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "a", branch: "main", event: "push" })
+    items = flakewatch.History().items_from_jsonl([history_path])
+    assert_equal(4, items.len(), "item count")
+    assert_equal("pkg.FlakyTest", items[0]["classname"], "classname")
+    assert_equal("alternates", items[0]["name"], "name")
+    assert_equal("failed", items[1]["status"], "status")
+    assert_equal(0.01, items[0]["duration"], "duration")
+
   test_junit_files_are_sorted_for_stable_matrix_reports: ->
     files = flakewatch
       .JUnit()
