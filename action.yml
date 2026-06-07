@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.26
+    default: v0.6.27
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -135,10 +135,27 @@ runs:
       env:
         HISTORY_PATTERN: ${{ steps.flakewatch-history.outputs.pattern }}
       run: |
+        workspace="${GITHUB_WORKSPACE:-$PWD}"
+
+        absolute_path() {
+          case "$1" in
+            /*) printf '%s\n' "$1" ;;
+            *) printf '%s\n' "${workspace}/${1}" ;;
+          esac
+        }
+
         junit_pattern="${{ inputs.junit }}"
         if [ -n "${{ inputs.junit-artifact-pattern }}" ]; then
-          junit_pattern="${{ inputs.download-artifact-path }}/**/*.xml"
+          junit_pattern="$(absolute_path "${{ inputs.download-artifact-path }}")/**/*.xml"
+        else
+          case "$junit_pattern" in
+            /*) ;;
+            *) junit_pattern="${workspace}/${junit_pattern}" ;;
+          esac
         fi
+
+        output_path="$(absolute_path "${{ inputs.output }}")"
+        source_root="$(absolute_path "${{ inputs['source-root'] }}")"
 
         if [ -n "${{ inputs['source-base-url'] }}" ]; then
           source_base_url="${{ inputs['source-base-url'] }}"
@@ -148,9 +165,9 @@ runs:
 
         args=(
           "--junit=$junit_pattern"
-          "--output=${{ inputs.output }}"
+          "--output=$output_path"
           "--source-base-url=$source_base_url"
-          "--source-root=${{ inputs['source-root'] }}"
+          "--source-root=$source_root"
         )
 
         if [ -n "$HISTORY_PATTERN" ]; then
@@ -167,12 +184,13 @@ runs:
         fi
 
         set +e
+        cd "${{ github.action_path }}"
         flakewatch "${args[@]}"
         flakewatch_status=$?
         set -e
-        if [ ! -s "${{ inputs.output }}" ]; then
+        if [ ! -s "$output_path" ]; then
           echo "::warning::flakewatch did not create a non-empty '${{ inputs.output }}'; writing a fallback report."
-          printf '%s\n' '<!doctype html><meta charset="utf-8"><title>Flakewatch</title><h1>Flakewatch report unavailable</h1>' > "${{ inputs.output }}"
+          printf '%s\n' '<!doctype html><meta charset="utf-8"><title>Flakewatch</title><h1>Flakewatch report unavailable</h1>' > "$output_path"
         fi
         if [ "$flakewatch_status" -ne 0 ]; then
           echo "::warning::flakewatch exited with status ${flakewatch_status}, but generated '${{ inputs.output }}'."
