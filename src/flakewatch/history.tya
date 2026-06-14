@@ -40,6 +40,8 @@ class History
         out.push(pattern)
     out.sort()
 
+  hex_digit?: char -> "0123456789abcdefABCDEF".contains(char)
+
   items_from_jsonl: patterns ->
     out = []
     for path_name in files(patterns)
@@ -124,6 +126,16 @@ class History
       message: json_string(line, "message")
     out
 
+  safe_json_escape_at?: line, i ->
+    if i + 5 >= line.byte_len()
+      return false
+    line[i] == "\\"
+      and line[i + 1] == "u"
+      and hex_digit?(line[i + 2])
+      and hex_digit?(line[i + 3])
+      and hex_digit?(line[i + 4])
+      and hex_digit?(line[i + 5])
+
   unescape_json_string: text ->
     text
       .replace("\\\"", "\"")
@@ -134,15 +146,18 @@ class History
       .replace("\\t", "\t")
 
   unsafe_json_chars?: line ->
-    if line.contains("\\")
-      return true
     if line.contains("&")
       return true
     if line.byte_len() != line.len()
       return true
     i = 0
     while i < line.byte_len()
-      if numeric_apostrophe_entity?(line, i)
-        return true
-      i = i + 1
+      if line[i] == "\\"
+        if not safe_json_escape_at?(line, i)
+          return true
+        i = i + 6
+      else
+        if numeric_apostrophe_entity?(line, i)
+          return true
+        i = i + 1
     false

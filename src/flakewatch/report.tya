@@ -11,104 +11,7 @@ class Report
     self.history = History()
     self.junit = JUnit()
 
-  build_rows: rows, filter_field, row_class, link_context ->
-    data_rows = []
-    for row in rows
-      if filter_field == "" or row[filter_field] > 0
-        data_rows.push(
-          row_class(
-            row,
-            link_context["source_base_url"],
-            link_context["source_root"],
-            link_context["source_cache"],
-            link_context["source_line_cache"]
-          )
-        )
-    data_rows
-
-  combined_items: history_patterns, junit_patterns ->
-    out = []
-    for item in history_items(history_patterns)
-      out.push(item)
-    for item in junit_items(junit_patterns)
-      out.push(item)
-    out
-
-  history_items: patterns ->
-    if patterns.len() == 0
-      return []
-    history.items_from_jsonl(patterns)
-
-  junit_items: patterns ->
-    items = []
-    for source in junit_sources(patterns)
-      for item in source["items"]
-        items.push(item)
-    items
-
-  junit_rows: patterns -> rows_from_items(junit_items(patterns))
-
-  junit_sources: patterns ->
-    sources = []
-    for path_name in junit.files(patterns)
-      items = junit.parse_file(path_name)
-      key = path_name
-      if items.len() > 0 and items[0]["timestamp"] != ""
-        key = items[0]["timestamp"] + " " + path_name
-      source = { path: path_name, key: key, items: items }
-      sources.push(source)
-    top_sources(sources)
-
-  link_context: source_base_url, source_root, source_cache, source_line_cache ->
-    context =
-      source_base_url: source_base_url
-      source_root: source_root
-      source_cache: source_cache
-      source_line_cache: source_line_cache
-    context
-
-  recent_all_passed: statuses, limit ->
-    if statuses.len() < limit
-      return false
-    i = statuses.len() - limit
-    while i < statuses.len()
-      if statuses[i] != "true"
-        return false
-      i = i + 1
-    true
-
-  render: opts ->
-    opts["history"] ??= []
-    opts["junit"] ??= []
-    opts["source_base_url"] ??= ""
-    opts["source_root"] ??= "."
-    rows = rows_from_items(combined_items(opts["history"], opts["junit"]))
-    render_rows(rows, opts["source_base_url"], opts["source_root"])
-
-  render_file: opts ->
-    html = render(opts)
-    file.File.write(opts["output"], html)
-    println("wrote " + opts["output"])
-
-  render_page: data ->
-    template
-      .Template(template_path("report.html"))
-      .render_file(data, { escape: "html" })
-
-  render_rows: rows, source_base_url, source_root ->
-    source_cache = {}
-    source_line_cache = {}
-    data = self.template_data(
-      rows,
-      source_base_url,
-      source_root,
-      source_cache,
-      source_line_cache
-    )
-    render_page(data)
-
-  rows_from_items: items ->
-    by_test = {}
+  apply_items: by_test, items ->
     for item in items
       class_name = text(item["classname"])
       if class_name == ""
@@ -164,6 +67,167 @@ class Report
       if item["duration"] > row["max_duration"]
         row["max_duration"] = item["duration"]
       row["last_status"] = status
+
+  build_rows: rows, filter_field, row_class, link_context ->
+    data_rows = []
+    for row in rows
+      if filter_field == "" or row[filter_field] > 0
+        data_rows.push(
+          row_class(
+            row,
+            link_context["source_base_url"],
+            link_context["source_root"],
+            link_context["source_cache"],
+            link_context["source_line_cache"]
+          )
+        )
+    data_rows
+
+  combined_items: junit_patterns, history_patterns ->
+    out = []
+    past_items = history_items(history_patterns)
+    current_items = junit_items(junit_patterns)
+    for item in past_items
+      out.push(item)
+    for item in current_items
+      out.push(item)
+    out
+
+  history_items: patterns ->
+    if patterns.len() == 0
+      return []
+    history.items_from_jsonl(patterns)
+
+  junit_items: patterns ->
+    items = []
+    for source in junit_sources(patterns)
+      for item in source["items"]
+        items.push(item)
+    items
+
+  junit_rows: patterns -> rows_from_items(junit_items(patterns))
+
+  junit_sources: patterns ->
+    sources = []
+    for path_name in junit.files(patterns)
+      items = junit.parse_file(path_name)
+      key = path_name
+      if items.len() > 0 and items[0]["timestamp"] != ""
+        key = items[0]["timestamp"] + " " + path_name
+      source = { path: path_name, key: key, items: items }
+      sources.push(source)
+    top_sources(sources)
+
+  link_context: source_base_url, source_root, source_cache, source_line_cache ->
+    context =
+      source_base_url: source_base_url
+      source_root: source_root
+      source_cache: source_cache
+      source_line_cache: source_line_cache
+    context
+
+  recent_all_passed: statuses, limit ->
+    if statuses.len() < limit
+      return false
+    i = statuses.len() - limit
+    while i < statuses.len()
+      if statuses[i] != "true"
+        return false
+      i = i + 1
+    true
+
+  render: opts ->
+    history_patterns = opts["history"]
+    if history_patterns == nil
+      history_patterns = []
+    junit_patterns = opts["junit"]
+    if junit_patterns == nil
+      junit_patterns = []
+    source_base_url = opts["source_base_url"]
+    if source_base_url == nil
+      source_base_url = ""
+    source_root = opts["source_root"]
+    if source_root == nil
+      source_root = "."
+    past_items = history_items(history_patterns)
+    current_items = junit_items(junit_patterns)
+    rows = rows_from_items(past_items)
+    current_rows = rows_from_items(current_items)
+    for current_row in current_rows
+      matched = nil
+      for row in rows
+        if row["name"] == current_row["name"]
+          matched = row
+      if matched == nil
+        rows.push(current_row)
+      else
+        for passish in current_row["recent_passish"]
+          if (
+            matched["previous_passish"] != "" and matched["previous_passish"] != passish
+          )
+            matched["transition_count"] = matched["transition_count"] + 1
+          matched["previous_passish"] = passish
+          matched["recent_passish"].push(passish)
+        if matched["file"] == "" and current_row["file"] != ""
+          matched["file"] = current_row["file"]
+        if matched["line"] == "" and current_row["line"] != ""
+          matched["line"] = current_row["line"]
+        matched["observations"] = matched["observations"]
+          + current_row["observations"]
+        matched["pass_count"] = matched["pass_count"]
+          + current_row["pass_count"]
+        matched["fail_count"] = matched["fail_count"]
+          + current_row["fail_count"]
+        matched["error_count"] = matched["error_count"]
+          + current_row["error_count"]
+        matched["skipped_count"] = matched["skipped_count"]
+          + current_row["skipped_count"]
+        matched["failure_count"] = matched["failure_count"]
+          + current_row["failure_count"]
+        matched["total_duration"] = matched["total_duration"]
+          + current_row["total_duration"]
+        if current_row["max_duration"] > matched["max_duration"]
+          matched["max_duration"] = current_row["max_duration"]
+        matched["last_status"] = current_row["last_status"]
+        matched["avg_duration"] = matched["total_duration"]
+          / matched["observations"]
+        non_pass = matched["fail_count"] + matched["error_count"]
+        matched["flake_score"] = 0
+        if matched["pass_count"] > 0 and non_pass > 0
+          matched["flake_score"] = 50
+            + matched["transition_count"] * 10
+            + non_pass * 5
+        matched["healed_score"] = 0
+        if (
+          matched["flake_score"] > 0 and recent_all_passed(matched["recent_passish"], 10)
+        )
+          matched["healed_score"] = matched["flake_score"]
+          matched["flake_score"] = 0
+    render_rows(rows, source_base_url, source_root)
+
+  render_file: opts ->
+    html = render(opts)
+    file.File.write(opts["output"], html)
+    println("wrote " + opts["output"])
+
+  render_page: data ->
+    template
+      .Template(template_path("report.html"))
+      .render_file(data, { escape: "html" })
+
+  render_rows: rows, source_base_url, source_root ->
+    source_cache = {}
+    source_line_cache = {}
+    data = self.template_data(
+      rows,
+      source_base_url,
+      source_root,
+      source_cache,
+      source_line_cache
+    )
+    render_page(data)
+
+  rows_from_by_test: by_test ->
     rows = []
     for key in by_test.keys()
       row = by_test[key]
@@ -178,6 +242,11 @@ class Report
         row["flake_score"] = 0
       rows.push(row)
     rows
+
+  rows_from_items: items ->
+    by_test = {}
+    apply_items(by_test, items)
+    rows_from_by_test(by_test)
 
   section: kind, title, rows, empty_message ->
     out =
