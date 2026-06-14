@@ -119,6 +119,15 @@ class FlakewatchTest extends TestCase
     assert(html.contains("pkg.AlwaysFailTest.fails"), "slow test")
     assert(html.contains("<strong>6</strong>slow tests"), "slow count")
 
+  test_jsonl_history_allows_unicode_escapes: ->
+    slash = "\\"
+    line = "pkg." + slash + "u65e5" + slash + "u672c" + slash + "u8a9eTest"
+    assert_equal(
+      false,
+      flakewatch.History().unsafe_json_chars?(line),
+      "unicode escape"
+    )
+
   test_jsonl_history_extends_html_observations: ->
     history_path = "tmp/flakewatch-history.jsonl"
     if file.File.exists?(history_path)
