@@ -1,0 +1,34 @@
+import cli/* as cli
+import dir
+import net/http/*
+
+class ServeCommand extends cli.Command
+  name: "serve"
+  description: "Start the flakewatch web server"
+  examples: ["serve", "serve --port=8080 --data-dir=/data"]
+  options: [
+    cli.Spec.option("port", "Port to listen on", { default: "8080" }),
+    cli.Spec.option("data-dir", "Directory to store run data", { default: "data" })
+  ]
+  index_html: ""
+  dashboard_html: ""
+
+  call: invocation ->
+    port_str = invocation.params["port"]
+    data_dir = invocation.params["data-dir"]
+
+    dir.Dir.mkdir_all(data_dir)
+
+    data_store = ServerStore(data_dir)
+    auth_obj = ServerAuth()
+    h = ServerHandlers(data_store, self.index_html, self.dashboard_html)
+
+    app = net.http.Server()
+    app.use(auth_obj.middleware)
+    app.get("/", h.get_index)
+    app.get("/projects/:slug", h.get_project)
+    app.post("/api/runs", h.post_runs)
+
+    println("flakewatch server listening on :" + port_str)
+    app.run(port_str.to_i())
+    cli.Result.success("")

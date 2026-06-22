@@ -1,0 +1,46 @@
+import bytes
+import json
+import template
+
+class ServerHandlers
+  store: nil
+  index_tmpl: nil
+  dashboard_tmpl: nil
+
+  initialize: store_arg, index_src, dashboard_src ->
+    self.store = store_arg
+    self.index_tmpl = template.Template(index_src)
+    self.dashboard_tmpl = template.Template(dashboard_src)
+
+  get_index: _req ->
+    projects = self.store.projects()
+    html = self.index_tmpl.render({ projects: projects, project_count: projects.len() }, { escape: "html" })
+    { status: 200, headers: {"Content-Type": "text/html"}, body: html }
+
+  get_project: req ->
+    slug = req["params"]["slug"]
+    flaky = self.store.project_flaky_summary(slug)
+    runs = self.store.project_runs(slug)
+    html = self.dashboard_tmpl.render({
+      slug: slug,
+      flaky: flaky,
+      flaky_count: flaky.len(),
+      has_flaky: flaky.len() > 0,
+      run_count: runs.len()
+    }, { escape: "html" })
+    { status: 200, headers: {"Content-Type": "text/html"}, body: html }
+
+  post_runs: req ->
+    body = bytes.Bytes(req["body"]).to_string()
+    count = 0
+    errors = 0
+    for line in body.split("\n")
+      if line != ""
+        try
+          item = json.Json.parse(line)
+          self.store.append_run(item)
+          count = count + 1
+        catch _err
+          errors = errors + 1
+    resp_body = json.Json.dump({ ok: true, count: count, errors: errors })
+    { status: 201, headers: {"Content-Type": "application/json"}, body: resp_body }

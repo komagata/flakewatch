@@ -1,0 +1,16 @@
+import os
+
+class ServerAuth
+  api_key: nil
+
+  initialize: ->
+    self.api_key = os.Os.env("FLAKEWATCH_API_KEY")
+
+  middleware: req, next ->
+    if self.api_key == nil or self.api_key == ""
+      return next.call(req)
+    key = req["headers"].get("x-api-key", "")
+    if key != self.api_key
+      err_body = '{"error":"unauthorized"}'
+      return { status: 401, body: err_body, headers: {"Content-Type": "application/json"} }
+    next.call(req)

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flakewatch</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f8f7f4;
+      color: #1a1a1a;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .topbar {
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 56px;
+      border-bottom: 1px solid #e8e4de;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #1a1a1a;
+      text-decoration: none;
+    }
+    .logo svg { width: 22px; height: 22px; }
+    .topbar-right {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a09890;
+    }
+    .page-header {
+      background: #ffffff;
+      padding: 32px 40px 28px;
+      border-bottom: 1px solid #e8e4de;
+    }
+    .page-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #a09890;
+      margin-bottom: 6px;
+    }
+    .page-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: #1a1a1a;
+      letter-spacing: -0.02em;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      padding: 24px 40px;
+      flex: 1;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e8e4de;
+      border-radius: 8px;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      text-decoration: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .card:hover {
+      border-color: #c8c0b8;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .card-slug {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a1a1a;
+      letter-spacing: 0.01em;
+    }
+    .card-status {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 3px;
+    }
+    .card-status.ok {
+      background: #f0faf4;
+      color: #2d7a47;
+      border: 1px solid #b8e8cc;
+    }
+    .card-status.warn {
+      background: #fffbf0;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+    .card-metrics {
+      display: flex;
+      gap: 28px;
+    }
+    .card-metric-label {
+      font-size: 10px;
+      color: #a09890;
+      margin-bottom: 4px;
+    }
+    .card-metric-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    .card-metric-value.amber { color: #d97706; }
+    .card-footer {
+      font-size: 11px;
+      color: #c0b8b0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .card:hover .card-footer { color: #a09890; }
+    .empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      padding: 80px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #c0b8b0;
+    }
+    .bottombar {
+      background: #ffffff;
+      height: 36px;
+      border-top: 1px solid #e8e4de;
+      display: flex;
+      align-items: center;
+      padding: 0 40px;
+      gap: 24px;
+    }
+    .bottombar span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #c0b8b0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1" y="1" width="20" height="20" rx="3" stroke="#d8d0c8" stroke-width="1"/>
+      <polyline points="3,15 7,9 10,13 14,6 19,11" stroke="#d97706" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <circle cx="14" cy="6" r="1.5" fill="#d97706"/>
+    </svg>
+    flakewatch
+  </div>
+  <div class="topbar-right">{{ project_count }} projects</div>
+</div>
+
+<div class="page-header">
+  <div class="page-label">Overview</div>
+  <div class="page-title">Projects</div>
+</div>
+
+{{ if project_count == 0 }}
+<div class="empty">no projects yet</div>
+{{ else }}
+<div class="grid">
+  {{ for p in projects }}
+  <a class="card" href="/projects/{{ p.slug }}">
+    <div class="card-top">
+      <div class="card-slug">{{ p.slug }}</div>
+      {{ if p.flaky_count > 0 }}
+      <div class="card-status warn">{{ p.flaky_count }} flaky</div>
+      {{ else }}
+      <div class="card-status ok">nominal</div>
+      {{ end }}
+    </div>
+    <div class="card-metrics">
+      <div>
+        <div class="card-metric-label">Flaky Tests</div>
+        <div class="card-metric-value {{ if p.flaky_count > 0 }}amber{{ end }}">{{ p.flaky_count }}</div>
+      </div>
+      <div>
+        <div class="card-metric-label">Total Runs</div>
+        <div class="card-metric-value">{{ p.run_count }}</div>
+      </div>
+    </div>
+    <div class="card-footer">View dashboard →</div>
+  </a>
+  {{ end }}
+</div>
+{{ end }}
+
+<div class="bottombar">
+  <span>flakewatch · v0.1.0</span>
+  <span>intermittent signal monitor</span>
+</div>
+
+</body>
+</html>

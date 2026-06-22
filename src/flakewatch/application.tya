@@ -72,7 +72,13 @@ class Application extends cli.Application
   # Application.run_and_exit runs the CLI from argv and exits the process.
   # @param argv Array command-line arguments.
   # @return Nil exits the process.
-  static run_and_exit: argv -> Application().run_and_exit(argv)
+  static run_and_exit: argv, index_html = "", dashboard_html = "" ->
+    app = Application()
+    cmd = ServeCommand()
+    cmd.index_html = index_html
+    cmd.dashboard_html = dashboard_html
+    app.register(cmd)
+    app.run_and_exit(argv)
 
   # Application.call renders a report and optionally writes history.
   # @param invocation cli.Invocation parsed command invocation.

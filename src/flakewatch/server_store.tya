@@ -1,0 +1,98 @@
+import dir
+import file
+import json
+import sync/*
+
+class ServerStore
+  data_dir: nil
+  mu: nil
+
+  initialize: data_dir_arg ->
+    self.data_dir = data_dir_arg
+    self.mu = sync.Mutex()
+
+  slug_for: run ->
+    repo = run["repo"]
+    if repo == nil or repo == "" or repo == "local"
+      return "default"
+    repo.replace("/", "-")
+
+  project_path: slug ->
+    self.data_dir + "/" + slug
+
+  runs_path: slug ->
+    project_path(slug) + "/runs.jsonl"
+
+  append_run: run ->
+    slug = slug_for(run)
+    sync_lock(self.mu)
+    try
+      dir.Dir.mkdir_all(project_path(slug))
+      line = json.Json.dump(run) + "\n"
+      file.File.append(runs_path(slug), line)
+    finally
+      sync_unlock(self.mu)
+
+  projects: ->
+    sync_lock(self.mu)
+    out = []
+    try
+      if file.File.exists?(self.data_dir)
+        for entry in dir.Dir.list(self.data_dir)
+          rpath = runs_path(entry)
+          if file.File.exists?(rpath)
+            runs = read_runs(rpath)
+            flaky = compute_flaky(runs)
+            out.push({
+              slug: entry,
+              run_count: runs.len(),
+              flaky_count: flaky.len()
+            })
+    finally
+      sync_unlock(self.mu)
+    out
+
+  read_runs: path ->
+    out = []
+    if file.File.exists?(path)
+      text = file.File.read(path)
+      for line in text.split("\n")
+        if line != ""
+          try
+            out.push(json.Json.parse(line))
+          catch _err
+            nil
+    out
+
+  project_runs: slug ->
+    sync_lock(self.mu)
+    out = []
+    try
+      out = read_runs(runs_path(slug))
+    finally
+      sync_unlock(self.mu)
+    out
+
+  compute_flaky: runs ->
+    counts = {}
+    for run in runs
+      key = run["classname"] + "#" + run["name"]
+      if not counts.has?(key)
+        counts[key] =
+          name: run["name"]
+          classname: run["classname"]
+          suite: run["suite"]
+          fail_count: 0
+          total_count: 0
+      counts[key]["total_count"] = counts[key]["total_count"] + 1
+      if run["status"] == "failed"
+        counts[key]["fail_count"] = counts[key]["fail_count"] + 1
+    out = []
+    for pair in counts.entries()
+      item = pair[1]
+      if item["fail_count"] >= 1 and item["total_count"] > item["fail_count"]
+        out.push(item)
+    out
+
+  project_flaky_summary: slug ->
+    compute_flaky(project_runs(slug))
