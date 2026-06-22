@@ -35,14 +35,17 @@ class History
     server_url = os.Os.env("FLAKEWATCH_SERVER_URL")
     if server_url == nil or server_url == ""
       return nil
-    api_key = os.Os.env("FLAKEWATCH_API_KEY")
-    body = lines.join("\n") + "\n"
-    headers = { "Content-Type": "application/x-ndjson" }
-    if api_key != nil and api_key != ""
-      headers["X-Api-Key"] = api_key
-    resp = http_client.Client(server_url + "/api/runs").request("POST", { body: body, headers: headers })
-    if resp["status"] != 201
-      println("warning: flakewatch-server responded " + resp["status"].to_string())
+    try
+      api_key = os.Os.env("FLAKEWATCH_API_KEY")
+      body = lines.join("\n") + "\n"
+      headers = { "Content-Type": "application/x-ndjson" }
+      if api_key != nil and api_key != ""
+        headers["X-Api-Key"] = api_key
+      resp = http_client.Client(server_url + "/api/runs").request("POST", { body: body, headers: headers })
+      if resp["status"] != 201
+        println("warning: flakewatch-server responded " + resp["status"].to_string())
+    catch err
+      println("warning: failed to send to flakewatch-server: " + err["message"])
 
   files: patterns ->
     out = []
