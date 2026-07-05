@@ -7,55 +7,6 @@ generate, upload, and link the HTML report.
 
 The default HTML workflow does not need a cache or restored artifacts.
 
-## flakewatch-server
-
-[flakewatch-server](https://github.com/komagata/flakewatch-server) は、テスト結果を受け取ってプロジェクトごとに可視化する Web アプリです。`FLAKEWATCH_SERVER_URL` を設定するだけで、flakewatch の実行時に自動的に結果が送信されます。
-
-### セットアップ
-
-```sh
-git clone https://github.com/komagata/flakewatch-server
-cd flakewatch-server
-tya build src/main.tya -o flakewatch-server
-
-PORT=8080 DATA_DIR=./data ./flakewatch-server
-```
-
-API キーで保護する場合は `FLAKEWATCH_API_KEY` を設定します。
-
-### flakewatch との連携
-
-```sh
-FLAKEWATCH_SERVER_URL=https://your-server.example.com \
-FLAKEWATCH_API_KEY=your-secret-key \
-flakewatch --junit="test/reports/**/*.xml" --history-output=history.jsonl
-```
-
-GitHub Actions の場合:
-
-```yaml
-- uses: komagata/flakewatch@main
-  with:
-    junit: test/reports/**/*.xml
-  env:
-    FLAKEWATCH_SERVER_URL: ${{ secrets.FLAKEWATCH_SERVER_URL }}
-    FLAKEWATCH_API_KEY: ${{ secrets.FLAKEWATCH_API_KEY }}
-```
-
-`FLAKEWATCH_SERVER_URL` が設定されていない場合は送信をスキップします。エラーが発生しても CI は失敗しません。
-
-### Fly.io へのデプロイ例
-
-```sh
-fly launch --no-deploy
-fly volumes create flakewatch_data --size 1
-fly secrets set FLAKEWATCH_API_KEY=your-secret-key
-tya build src/main.tya -o flakewatch-server
-fly deploy
-```
-
----
-
 ## Local CI
 
 Install the released Linux amd64 binary:
