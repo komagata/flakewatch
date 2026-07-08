@@ -157,6 +157,25 @@ class FlakewatchTest extends TestCase
     assert_equal("failed", items[1]["status"], "status")
     assert_equal(0.01, items[0]["duration"], "duration")
 
+  test_jsonl_history_renders_when_current_junit_directory_is_missing: ->
+    history_path = "tmp/flakewatch-history-only.jsonl"
+    if file.File.exists?(history_path)
+      file.File.remove(history_path)
+    flakewatch
+      .History()
+      .export_file({ output: history_path, junit: ["tests/fixtures/junit/run1.xml"], repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "a", branch: "main", event: "push" })
+    html = flakewatch
+      .Report()
+      .render({ junit: ["tmp/missing-junit/**/*.xml"], history: [history_path], source_base_url: "", source_root: "." })
+    assert(
+      html.contains("No current JUnit XML files were found"),
+      "missing junit notice"
+    )
+    assert(
+      html.contains("pkg.FlakyTest.alternates"),
+      "history rows still render"
+    )
+
   test_junit_files_are_sorted_for_stable_matrix_reports: ->
     files = flakewatch
       .JUnit()
@@ -172,6 +191,10 @@ class FlakewatchTest extends TestCase
         found = true
         assert_equal("failed", row["last_status"], "last status")
     assert(found, "flaky row")
+
+  test_junit_missing_glob_returns_no_files: ->
+    files = flakewatch.JUnit().files(["tmp/missing-junit/**/*.xml"])
+    assert_equal(0, files.len(), "files")
 
   test_junit_parse_single_quoted_attributes: ->
     cases = flakewatch
@@ -228,6 +251,16 @@ class FlakewatchTest extends TestCase
       ),
       "second name in report"
     )
+
+  test_missing_junit_and_history_directories_render_notice: ->
+    html = flakewatch
+      .Report()
+      .render({ junit: ["tmp/missing-junit/**/*.xml"], history: ["tmp/missing-history/**/*.jsonl"], source_base_url: "", source_root: "." })
+    assert(
+      html.contains("No JUnit XML files or history records were found"),
+      "missing inputs notice"
+    )
+    assert(html.contains("<h1>Flakewatch Report</h1>"), "report renders")
 
   test_root_help_uses_tya_cli_application: ->
     outcome = flakewatch.Application().run([])

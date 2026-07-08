@@ -57,7 +57,10 @@ class Application extends Command
       elseif argument["required"]
         path_text = join(full_path, " ")
         usage = command.usage_for(full_path.slice(0, full_path.len() - 1))
-        return "ERROR: \"{path_text}\" was called with no arguments\nUsage: \"{usage}\""
+        return """
+          ERROR: "{path_text}" was called with no arguments
+          Usage: "{usage}"
+          """
       else
         values[argument["argname"]] = nil
     nil
@@ -213,7 +216,9 @@ class Application extends Command
       return Result.failure(arguments_error)
     invocation = Invocation(
       command: self,
-      path: [name],
+      path: [
+        name
+      ],
       args: argv,
       params: params
     )

@@ -8,6 +8,17 @@ class JUnit
   initialize: ->
     self.path_finder = JUnitPathFinder()
 
+  attr: text, name -> attr_with_default(text, name, "")
+
+  attr_with_default: text, name, default_value ->
+    marker = " " + name + "=\""
+    if text.contains(marker)
+      return unescape_xml(text.split(marker)[1].split("\"")[0])
+    marker = " " + name + "='"
+    if text.contains(marker)
+      return unescape_xml(text.split(marker)[1].split("'")[0])
+    default_value
+
   case_from: suite_name, suite_timestamp, item ->
     status = "passed"
     message = ""
@@ -50,31 +61,6 @@ class JUnit
       system_err: stderr
     out
 
-  files: patterns -> path_finder.files(patterns)
-
-  parse: text ->
-    cases = []
-    for suite_part in text.split("<testsuite")
-      if suite_part.contains("<testcase")
-        parse_suite_text(suite_part, cases)
-    cases
-
-  parse_duration: text -> text.to_f()
-
-  parse_file: path_name -> parse(file.File.read(path_name))
-
-  parse_suite_text: suite_text, cases ->
-    suite_header = suite_text.split(">")[0]
-    suite_name = attr(suite_header, "name")
-    suite_timestamp = attr(suite_header, "timestamp")
-    parts = suite_text.split("<testcase")
-    i = 1
-    while i < parts.len()
-      item = case_from_text(suite_name, suite_timestamp, parts[i])
-      if item != nil
-        cases.push(item)
-      i = i + 1
-
   case_from_text: suite_name, suite_timestamp, text ->
     header = text.split(">")[0]
     status = "passed"
@@ -110,17 +96,6 @@ class JUnit
       system_err: element_named_text(text, "system-err")
     out
 
-  attr: text, name -> attr_with_default(text, name, "")
-
-  attr_with_default: text, name, default_value ->
-    marker = " " + name + "=\""
-    if text.contains(marker)
-      return unescape_xml(text.split(marker)[1].split("\"")[0])
-    marker = " " + name + "='"
-    if text.contains(marker)
-      return unescape_xml(text.split(marker)[1].split("'")[0])
-    default_value
-
   element_named_text: text, name ->
     marker = "<" + name
     if not text.contains(marker)
@@ -138,6 +113,31 @@ class JUnit
     value = rest.split("</")[0]
     unescape_xml(value)
 
+  files: patterns -> path_finder.files(patterns)
+
+  parse: text ->
+    cases = []
+    for suite_part in text.split("<testsuite")
+      if suite_part.contains("<testcase")
+        parse_suite_text(suite_part, cases)
+    cases
+
+  parse_duration: text -> text.to_f()
+
+  parse_file: path_name -> parse(file.File.read(path_name))
+
+  parse_suite_text: suite_text, cases ->
+    suite_header = suite_text.split(">")[0]
+    suite_name = attr(suite_header, "name")
+    suite_timestamp = attr(suite_header, "timestamp")
+    parts = suite_text.split("<testcase")
+    i = 1
+    while i < parts.len()
+      item = case_from_text(suite_name, suite_timestamp, parts[i])
+      if item != nil
+        cases.push(item)
+      i = i + 1
+
   unescape_xml: text ->
     text
       .replace("&quot;", "\"")
@@ -150,6 +150,8 @@ class JUnitPathFinder
   collect_xml: root, out ->
     if root == ""
       root = "."
+    if not file.File.exists?(root)
+      return nil
     for name in dir.Dir.list(root)
       full = path.Path().join([root, name])
       if name.ends_with(".xml")

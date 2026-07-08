@@ -111,11 +111,23 @@
       padding: 18px;
       color: #64748b;
     }
+
+    .notice {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      padding: 14px 18px;
+      color: #9a3412;
+      margin: 18px 0;
+    }
   </style>
 </head>
 <body>
   <h1>Flakewatch Report</h1>
   <p>JUnit XML analysis for flaky and slow tests.</p>
+  {{ for notice in notices }}
+    <div class="notice">{{ notice }}</div>
+  {{ end }}
   <div class="summary">
     {{ for metric in metrics }}
       <div class="metric"><strong>{{ metric.value }}</strong>{{ metric.label }}</div>

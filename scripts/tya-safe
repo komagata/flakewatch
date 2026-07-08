@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -u
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root" || exit 1
+
+mkdir -p tmp
+
+timeout_seconds="${TYA_SAFE_TIMEOUT:-20}"
+stamp="$(date +%Y%m%d-%H%M%S)"
+log_path="tmp/tya-safe-${stamp}.log"
+status_path="tmp/tya-safe-${stamp}.status"
+done_path="tmp/tya-safe-${stamp}.done"
+
+{
+  printf 'cwd: %s\n' "$repo_root"
+  printf 'timeout: %ss\n' "$timeout_seconds"
+  printf 'command:'
+  printf ' %q' tya "$@"
+  printf '\n\n'
+  printf 'isolation: setsid, stdin=/dev/null, stdout/stderr=file\n'
+  printf '\n'
+} >"$log_path"
+
+(
+  set +e
+  exec </dev/null
+  if command -v setsid >/dev/null 2>&1; then
+    setsid timeout --foreground --kill-after=3s "$timeout_seconds" tya "$@" >>"$log_path" 2>&1
+  else
+    timeout --kill-after=3s "$timeout_seconds" tya "$@" >>"$log_path" 2>&1
+  fi
+  status=$?
+
+  printf '%s\n' "$status" >"$status_path"
+
+  if [ "$status" -eq 124 ]; then
+    printf 'timed out after %ss\n' "$timeout_seconds" >>"$log_path"
+  elif [ "$status" -eq 137 ]; then
+    printf 'killed after timeout grace period\n' >>"$log_path"
+  fi
+
+  printf 'done\n' >"$done_path"
+) &
+runner_pid=$!
+
+while kill -0 "$runner_pid" 2>/dev/null; do
+  sleep 0.2
+done
+
+wait "$runner_pid" 2>/dev/null
+
+if [ -f "$status_path" ]; then
+  status="$(cat "$status_path")"
+else
+  status=125
+  printf '%s\n' "$status" >"$status_path"
+  printf 'runner exited before writing status\n' >>"$log_path"
+fi
+
+printf 'status=%s\nlog=%s\nstatus_file=%s\n' "$status" "$log_path" "$status_path"
+exit "$status"

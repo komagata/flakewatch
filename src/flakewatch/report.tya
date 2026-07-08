@@ -98,18 +98,22 @@ class Report
       return []
     history.items_from_jsonl(patterns)
 
-  junit_items: patterns ->
+  junit_items: patterns -> junit_items_from_files(junit.files(patterns))
+
+  junit_items_from_files: files ->
     items = []
-    for source in junit_sources(patterns)
+    for source in junit_sources_from_files(files)
       for item in source["items"]
         items.push(item)
     items
 
   junit_rows: patterns -> rows_from_items(junit_items(patterns))
 
-  junit_sources: patterns ->
+  junit_sources: patterns -> junit_sources_from_files(junit.files(patterns))
+
+  junit_sources_from_files: files ->
     sources = []
-    for path_name in junit.files(patterns)
+    for path_name in files
       items = junit.parse_file(path_name)
       key = path_name
       if items.len() > 0 and items[0]["timestamp"] != ""
@@ -150,7 +154,8 @@ class Report
     if source_root == nil
       source_root = "."
     past_items = history_items(history_patterns)
-    current_items = junit_items(junit_patterns)
+    junit_files = junit.files(junit_patterns)
+    current_items = junit_items_from_files(junit_files)
     rows = rows_from_items(past_items)
     current_rows = rows_from_items(current_items)
     for current_row in current_rows
@@ -203,7 +208,17 @@ class Report
         )
           matched["healed_score"] = matched["flake_score"]
           matched["flake_score"] = 0
-    render_rows(rows, source_base_url, source_root)
+    notices = []
+    if junit_patterns.len() > 0 and junit_files.len() == 0
+      if past_items.len() > 0
+        notices.push(
+          "No current JUnit XML files were found. Showing report data from history only."
+        )
+      else
+        notices.push(
+          "No JUnit XML files or history records were found. Check the JUnit artifact pattern and test report output path."
+        )
+    render_rows(rows, source_base_url, source_root, notices)
 
   render_file: opts ->
     html = render(opts)
@@ -215,7 +230,7 @@ class Report
       .Template(template_path("report.html"))
       .render_file(data, { escape: "html" })
 
-  render_rows: rows, source_base_url, source_root ->
+  render_rows: rows, source_base_url, source_root, notices ->
     source_cache = {}
     source_line_cache = {}
     data = self.template_data(
@@ -223,7 +238,8 @@ class Report
       source_base_url,
       source_root,
       source_cache,
-      source_line_cache
+      source_line_cache,
+      notices
     )
     render_page(data)
 
@@ -268,7 +284,7 @@ class Report
         count = count + 1
     count
 
-  template_data: rows, source_base_url, source_root, source_cache, source_line_cache ->
+  template_data: rows, source_base_url, source_root, source_cache, source_line_cache, notices ->
     source_cache = {}
     source_line_cache = {}
     total = 0
@@ -304,6 +320,7 @@ class Report
           label: "slow tests"
         }
       ]
+      notices: notices
       sections: [
         section(
           "flaky",

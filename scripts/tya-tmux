@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -u
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root" || exit 1
+
+mkdir -p tmp
+
+if ! command -v tmux >/dev/null 2>&1; then
+  printf 'tmux is required for scripts/tya-tmux\n' >&2
+  exit 127
+fi
+
+timeout_seconds="${TYA_SAFE_TIMEOUT:-20}"
+stamp="$(date +%Y%m%d-%H%M%S)-$$"
+session_name="flakewatch-tya-${stamp}"
+log_path="tmp/tya-tmux-${stamp}.log"
+status_path="tmp/tya-tmux-${stamp}.status"
+done_path="tmp/tya-tmux-${stamp}.done"
+runner_path="tmp/tya-tmux-${stamp}.sh"
+
+{
+  printf 'cwd: %s\n' "$repo_root"
+  printf 'timeout: %ss\n' "$timeout_seconds"
+  printf 'session: %s\n' "$session_name"
+  printf 'command:'
+  printf ' %q' tya "$@"
+  printf '\n\n'
+  printf 'isolation: detached tmux session, stdin=/dev/null, stdout/stderr=file\n'
+  printf '\n'
+} >"$log_path"
+
+{
+  printf '#!/usr/bin/env bash\n'
+  printf 'set +e\n'
+  printf 'cd %q || exit 1\n' "$repo_root"
+  printf 'exec </dev/null\n'
+  printf 'timeout --kill-after=3s %q tya' "$timeout_seconds"
+  for arg in "$@"; do
+    printf ' %q' "$arg"
+  done
+  printf ' >>%q 2>&1\n' "$log_path"
+  printf 'status=$?\n'
+  printf 'printf "%%s\\n" "$status" >%q\n' "$status_path"
+  printf 'if [ "$status" -eq 124 ]; then printf "timed out after %ss\\n" >>%q; fi\n' "$timeout_seconds" "$log_path"
+  printf 'if [ "$status" -eq 137 ]; then printf "killed after timeout grace period\\n" >>%q; fi\n' "$log_path"
+  printf 'printf "done\\n" >%q\n' "$done_path"
+} >"$runner_path"
+chmod +x "$runner_path"
+
+tmux new-session -d -s "$session_name" "$runner_path"
+
+deadline=$((SECONDS + timeout_seconds + 8))
+while [ ! -f "$done_path" ]; do
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    tmux kill-session -t "$session_name" 2>/dev/null || true
+    printf '%s\n' 124 >"$status_path"
+    printf 'tmux monitor timed out after %ss\n' "$((timeout_seconds + 8))" >>"$log_path"
+    printf 'done\n' >"$done_path"
+    break
+  fi
+  sleep 0.2
+done
+
+status="$(cat "$status_path" 2>/dev/null || printf '125')"
+printf 'status=%s\nlog=%s\nstatus_file=%s\nsession=%s\n' "$status" "$log_path" "$status_path" "$session_name"
+exit "$status"

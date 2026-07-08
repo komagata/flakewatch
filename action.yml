@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.31
+    default: v0.6.32
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -185,12 +185,44 @@ runs:
 
         set +e
         cd "${{ github.action_path }}"
-        flakewatch "${args[@]}"
+        flakewatch_log="${RUNNER_TEMP}/flakewatch.log"
+        flakewatch "${args[@]}" >"$flakewatch_log" 2>&1
         flakewatch_status=$?
+        cat "$flakewatch_log"
         set -e
         if [ ! -s "$output_path" ]; then
           echo "::warning::flakewatch did not create a non-empty '${{ inputs.output }}'; writing a fallback report."
-          printf '%s\n' '<!doctype html><meta charset="utf-8"><title>Flakewatch</title><h1>Flakewatch report unavailable</h1>' > "$output_path"
+          node - "$output_path" "$flakewatch_status" "$flakewatch_log" "${args[@]}" <<'NODE'
+        const fs = require("fs")
+
+        const [outputPath, status, logPath, ...args] = process.argv.slice(2)
+        const escape = (value) => String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+        const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf8") : ""
+        const html = `<!doctype html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Flakewatch report unavailable</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; margin: 32px; color: #1f2937; background: #f8fafc; }
+            pre { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; overflow: auto; }
+          </style>
+        </head>
+        <body>
+          <h1>Flakewatch report unavailable</h1>
+          <p>flakewatch exited with status ${escape(status)} before creating a report.</p>
+          <h2>Arguments</h2>
+          <pre>${escape(args.join("\n"))}</pre>
+          <h2>Log</h2>
+          <pre>${escape(log)}</pre>
+        </body>
+        </html>`
+        fs.writeFileSync(outputPath, html)
+        NODE
         fi
         if [ "$flakewatch_status" -ne 0 ]; then
           echo "::warning::flakewatch exited with status ${flakewatch_status}, but generated '${{ inputs.output }}'."

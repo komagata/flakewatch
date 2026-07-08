@@ -12,6 +12,7 @@
 
 ## Build, Test, and Development Commands
 
+- `./scripts/tya-tmux test tests/flakewatch_test.tya`: run Tya in a detached tmux session with timeout and logs.
 - `tya install`: install dependencies from `tya.toml` and `tya.lock`.
 - `tya test`: run the full test suite, including dependency tests.
 - `tya test tests/flakewatch_test.tya`: run only this project’s tests.
@@ -23,9 +24,22 @@
 Common local CLI flow:
 
 ```sh
-tya run src/main.tya \
+./scripts/tya-tmux run src/main.tya \
   --junit "tests/fixtures/junit/**/*.xml" \
   --output tmp/flakewatch.html
+```
+
+## Codex Runtime Safety
+
+When working from Codex, do not run `tya ...` directly. Use `./scripts/tya-tmux ...`
+so crashes or hangs stay in a detached tmux session and leave a timestamped log
+under `tmp/`. `./scripts/tya-safe ...` exists as a fallback, but it still waits
+from the Codex shell and has not been reliable enough for the test runner.
+Start with focused commands, for example:
+
+```sh
+TYA_SAFE_TIMEOUT=10 ./scripts/tya-tmux test tests/flakewatch_test.tya
+TYA_SAFE_TIMEOUT=10 ./scripts/tya-tmux run src/main.tya --junit=tests/fixtures/junit/**/*.xml --output=tmp/flakewatch.html
 ```
 
 ## Coding Style & Naming Conventions

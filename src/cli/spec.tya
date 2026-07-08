@@ -12,7 +12,10 @@ class Spec
       required = options["required"]
     if options.has?("array")
       array = options["array"]
-    { argname: name, description: description, required: required, array: array }
+    argname: name
+    description: description
+    required: required
+    array: array
 
   # Spec.boolean_option builds a boolean option spec.
   # @param name String option name.
@@ -24,7 +27,13 @@ class Spec
     aliases = []
     if options.has?("aliases")
       aliases = options["aliases"]
-    { name: name, description: description, default: default, boolean: true, array: false, aliases: aliases, allowed: [] }
+    name: name
+    description: description
+    default: default
+    boolean: true
+    array: false
+    aliases: aliases
+    allowed: []
 
   # Spec.option builds an option spec.
   # @param name String option name.
@@ -44,4 +53,10 @@ class Spec
       aliases = options["aliases"]
     if options.has?("allowed")
       allowed = options["allowed"]
-    { name: name, description: description, default: default, boolean: false, array: array, aliases: aliases, allowed: allowed }
+    name: name
+    description: description
+    default: default
+    boolean: false
+    array: array
+    aliases: aliases
+    allowed: allowed
