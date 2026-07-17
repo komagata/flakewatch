@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.32
+    default: v0.6.33
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -272,11 +272,34 @@ runs:
       env:
         REPORT_URL: ${{ steps.upload-flakewatch-report.outputs.artifact-url }}
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        REPORT_PATH: ${{ inputs.output }}
       run: |
+        report_metrics="$(node <<'NODE'
+        const fs = require("fs")
+        const path = require("path")
+
+        const workspace = process.env.GITHUB_WORKSPACE || process.cwd()
+        const reportPath = path.isAbsolute(process.env.REPORT_PATH)
+          ? process.env.REPORT_PATH
+          : path.join(workspace, process.env.REPORT_PATH)
+        const html = fs.existsSync(reportPath) ? fs.readFileSync(reportPath, "utf8") : ""
+        const metrics = Array.from(html.matchAll(/<div class="metric"><strong>(.*?)<\/strong>(.*?)<\/div>/g))
+          .map((match) => `${match[2].trim()}: ${match[1].trim()}`)
+
+        if (metrics.length > 0) {
+          console.log(metrics.join(" / "))
+        }
+        NODE
+        )"
+
         {
           echo "## Flakewatch"
           echo ""
           echo "<a href=\"${REPORT_URL}\" target=\"_blank\" rel=\"noopener noreferrer\">Open ${ARTIFACT_NAME}</a>"
+          if [ -n "$report_metrics" ]; then
+            echo ""
+            echo "$report_metrics"
+          fi
           echo ""
           echo "Open the generated HTML report in a new browser tab."
         } >> "$GITHUB_STEP_SUMMARY"
@@ -290,8 +313,12 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         REPORT_URL: ${{ steps.upload-flakewatch-report.outputs.artifact-url }}
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        REPORT_PATH: ${{ inputs.output }}
       run: |
         node <<'NODE'
+        const fs = require("fs")
+        const path = require("path")
+
         const markerStart = "<!-- flakewatch-report:start -->"
         const markerEnd = "<!-- flakewatch-report:end -->"
         const apiUrl = process.env.GITHUB_API_URL || "https://api.github.com"
@@ -302,11 +329,24 @@ runs:
         const reportUrl = process.env.REPORT_URL
         const bannerUrl = "https://raw.githubusercontent.com/komagata/flakewatch/main/assets/flakewatch-report.svg"
 
+        function reportMetrics() {
+          const workspace = process.env.GITHUB_WORKSPACE || process.cwd()
+          const reportPath = path.isAbsolute(process.env.REPORT_PATH)
+            ? process.env.REPORT_PATH
+            : path.join(workspace, process.env.REPORT_PATH)
+          const html = fs.existsSync(reportPath) ? fs.readFileSync(reportPath, "utf8") : ""
+          const metrics = Array.from(html.matchAll(/<div class="metric"><strong>(.*?)<\/strong>(.*?)<\/div>/g))
+            .map((match) => `- ${match[2].trim()}: ${match[1].trim()}`)
+
+          return metrics.length > 0 ? ["", ...metrics].join("\n") : ""
+        }
+
         const block = [
           markerStart,
           "## Flakewatch Report",
           "",
-          `<a href="${reportUrl}" target="_blank" rel="noopener noreferrer"><img src="${bannerUrl}" alt="Flakewatch Report" width="150"></a>`,
+          `<a href="${reportUrl}" target="_blank" rel="noopener noreferrer"><img src="${bannerUrl}" alt="Open ${artifactName}" width="150"></a>`,
+          reportMetrics(),
           markerEnd
         ].join("\n")
 
@@ -316,30 +356,37 @@ runs:
           "X-GitHub-Api-Version": "2022-11-28"
         }
 
-        const prUrl = `${apiUrl}/repos/${repo}/pulls/${prNumber}`
-        const response = await fetch(prUrl, { headers })
-        if (!response.ok) {
-          throw new Error(`Failed to fetch PR body: ${response.status} ${await response.text()}`)
+        async function main() {
+          const prUrl = `${apiUrl}/repos/${repo}/pulls/${prNumber}`
+          const response = await fetch(prUrl, { headers })
+          if (!response.ok) {
+            throw new Error(`Failed to fetch PR body: ${response.status} ${await response.text()}`)
+          }
+
+          const pr = await response.json()
+          const body = (pr.body || "").trimEnd()
+          const pattern = /<!-- flakewatch-report:start -->[\s\S]*?<!-- flakewatch-report:end -->/
+
+          const nextBody = pattern.test(body)
+            ? body.replace(pattern, block)
+            : `${body}\n\n${block}`.trim()
+
+          const updateResponse = await fetch(prUrl, {
+            method: "PATCH",
+            headers: {
+              ...headers,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ body: `${nextBody}\n` })
+          })
+
+          if (!updateResponse.ok) {
+            throw new Error(`Failed to update PR body: ${updateResponse.status} ${await updateResponse.text()}`)
+          }
         }
 
-        const pr = await response.json()
-        const body = (pr.body || "").trimEnd()
-        const pattern = /<!-- flakewatch-report:start -->[\s\S]*?<!-- flakewatch-report:end -->/
-
-        const nextBody = pattern.test(body)
-          ? body.replace(pattern, block)
-          : `${body}\n\n${block}`.trim()
-
-        const updateResponse = await fetch(prUrl, {
-          method: "PATCH",
-          headers: {
-            ...headers,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ body: `${nextBody}\n` })
+        main().catch((error) => {
+          console.error(error)
+          process.exit(1)
         })
-
-        if (!updateResponse.ok) {
-          throw new Error(`Failed to update PR body: ${updateResponse.status} ${await updateResponse.text()}`)
-        }
         NODE

@@ -34,6 +34,10 @@ class Report
           transition_count: 0
           total_duration: 0.0
           max_duration: 0.0
+          run_count: 0
+          source_ids: {}
+          first_observed_at: ""
+          last_observed_at: ""
           last_status: ""
           previous_passish: ""
           recent_passish: []
@@ -66,6 +70,26 @@ class Report
       row["total_duration"] = row["total_duration"] + item["duration"]
       if item["duration"] > row["max_duration"]
         row["max_duration"] = item["duration"]
+      source_id = text(item["source_id"])
+      if source_id == ""
+        source_id = text(item["run_id"])
+      if source_id == ""
+        source_id = text(item["timestamp"])
+      if source_id != "" and row["source_ids"][source_id] == nil
+        row["source_ids"][source_id] = "true"
+        row["run_count"] = row["run_count"] + 1
+      observed_at = text(item["observed_at"])
+      if observed_at == ""
+        observed_at = text(item["timestamp"])
+      if observed_at != ""
+        if (
+          row["first_observed_at"] == "" or observed_at < row["first_observed_at"]
+        )
+          row["first_observed_at"] = observed_at
+        if (
+          row["last_observed_at"] == "" or observed_at > row["last_observed_at"]
+        )
+          row["last_observed_at"] = observed_at
       row["last_status"] = status
 
   build_rows: rows, filter_field, row_class, link_context ->
@@ -104,6 +128,8 @@ class Report
     items = []
     for source in junit_sources_from_files(files)
       for item in source["items"]
+        item["source_id"] = source["key"]
+        item["observed_at"] = text(item["timestamp"])
         items.push(item)
     items
 
@@ -193,6 +219,18 @@ class Report
           + current_row["total_duration"]
         if current_row["max_duration"] > matched["max_duration"]
           matched["max_duration"] = current_row["max_duration"]
+        for source_id in current_row["source_ids"].keys()
+          if matched["source_ids"][source_id] == nil
+            matched["source_ids"][source_id] = "true"
+            matched["run_count"] = matched["run_count"] + 1
+        if (
+          current_row["first_observed_at"] != "" and (matched["first_observed_at"] == "" or current_row["first_observed_at"] < matched["first_observed_at"])
+        )
+          matched["first_observed_at"] = current_row["first_observed_at"]
+        if (
+          current_row["last_observed_at"] != "" and (matched["last_observed_at"] == "" or current_row["last_observed_at"] > matched["last_observed_at"])
+        )
+          matched["last_observed_at"] = current_row["last_observed_at"]
         matched["last_status"] = current_row["last_status"]
         matched["avg_duration"] = matched["total_duration"]
           / matched["observations"]
@@ -290,10 +328,13 @@ class Report
     total = 0
     observations = 0
     failures = 0
+    source_ids = {}
     for row in rows
       total = total + 1
       observations = observations + row["observations"]
       failures = failures + row["fail_count"] + row["error_count"]
+      for source_id in row["source_ids"].keys()
+        source_ids[source_id] = "true"
     slow_tests = slow_count(rows)
     links = link_context(
       source_base_url,
@@ -310,6 +351,10 @@ class Report
         {
           value: text(observations),
           label: "observations"
+        },
+        {
+          value: text(source_ids.keys().len()),
+          label: "test runs"
         },
         {
           value: text(failures),

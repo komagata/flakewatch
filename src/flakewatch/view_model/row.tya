@@ -1,11 +1,23 @@
 # Row stores fields and behavior shared by report table view models.
 class Row
+  # Row.first_observed_at stores the earliest known observation timestamp.
+  # @type String
+  first_observed_at: ""
+
+  # Row.last_observed_at stores the latest known observation timestamp.
+  # @type String
+  last_observed_at: ""
+
   # Row.name stores the full test name shown in the first column.
   # @type String
   name: ""
 
   # Row.row stores the source aggregate data used to build this view model.
   row: nil
+
+  # Row.run_count stores the number of distinct report inputs that observed this test.
+  # @type Int
+  run_count: 0
 
   # Row.source_base_url stores the repository URL prefix for source links.
   # @type String
@@ -28,6 +40,14 @@ class Row
     self.source_cache = source_cache
     self.source_line_cache = source_line_cache
     self.name = row["name"]
+    self.run_count = row["run_count"]
+    self.first_observed_at = display_time(row["first_observed_at"])
+    self.last_observed_at = display_time(row["last_observed_at"])
+
+  display_time: value ->
+    if value == nil or value == ""
+      return "unknown"
+    value
 
   test_href: -> test_link_value().href
 

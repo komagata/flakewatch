@@ -95,6 +95,8 @@ class History
       junit_path: junit_path
       suite: item["suite"]
       timestamp: item["timestamp"]
+      observed_at: item["timestamp"]
+      source_id: opts["run_id"] + "-" + opts["run_attempt"] + "-" + junit_path
       classname: item["classname"]
       name: item["name"]
       file: item["file"]
@@ -117,6 +119,8 @@ class History
       junit_path: json_string(line, "junit_path")
       suite: json_string(line, "suite")
       timestamp: json_string(line, "timestamp")
+      observed_at: json_string(line, "observed_at")
+      source_id: json_string(line, "source_id")
       classname: json_string(line, "classname")
       name: json_string(line, "name")
       file: json_string(line, "file")
