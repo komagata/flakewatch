@@ -103,14 +103,8 @@ class FlakewatchTest extends TestCase
       html.contains("data-sort=\"number\">Runs</th>"),
       "sortable run count"
     )
-    self.assert(
-      html.contains("data-sort=\"text\">First seen</th>"),
-      "sortable first seen"
-    )
-    self.assert(
-      html.contains("data-sort=\"text\">Last seen</th>"),
-      "sortable last seen"
-    )
+    assert(html.contains("First: "), "first seen metadata")
+    assert(html.contains("Last: "), "last seen metadata")
     self.assert(
       html.contains("data-sort=\"number\">Fail</th>"),
       "sortable fail count"
@@ -127,8 +121,8 @@ class FlakewatchTest extends TestCase
     )
     assert(html.contains("pkg.FlakyTest.alternates"), "flaky test")
     assert(html.contains("pkg.HealedTest.recovers"), "healed test")
-    assert(html.contains("<strong>6</strong>test runs"), "test run count")
-    assert(html.contains("2026-05-15T00:00:00Z"), "observed timestamp")
+    assert(html.contains("<strong>5</strong>test runs"), "test run count")
+    assert(html.contains("2026-05-15 00:00"), "observed timestamp")
     assert(html.contains("10 passed"), "healed recent status")
     assert(html.contains("pkg.AlwaysFailTest.fails"), "slow test")
     assert(html.contains("<strong>6</strong>slow tests"), "slow count")

@@ -35,12 +35,17 @@
 
     table {
       width: 100%;
-      table-layout: fixed;
       border-collapse: collapse;
       background: white;
       border: 1px solid #e5e7eb;
       border-radius: 8px;
       overflow: hidden;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      border-radius: 8px;
     }
 
     th,
@@ -84,17 +89,29 @@
       color: #0f172a;
     }
 
-    .test-col { width: 58%; }
+    .test-col {
+      min-width: 360px;
+      width: 40%;
+    }
+
+    .test-name { font-weight: 500; }
+
+    .test-meta {
+      margin-top: 4px;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.35;
+    }
 
     .num {
       text-align: right;
-      width: 96px;
+      min-width: 64px;
       white-space: nowrap;
     }
 
     .status {
       font-weight: 600;
-      width: 96px;
+      min-width: 72px;
       white-space: nowrap;
     }
 

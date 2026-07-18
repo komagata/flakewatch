@@ -1,3 +1,4 @@
+<div class="table-wrap">
 <table>
   <thead>
     <tr>
@@ -11,8 +12,6 @@
         <th class="num" data-sort="number">Error</th>
         <th class="num" data-sort="number">Transitions</th>
         <th class="status" data-sort="text">Last</th>
-        <th class="status" data-sort="text">First seen</th>
-        <th class="status" data-sort="text">Last seen</th>
       {{ end }}
       {{ if healed }}
         <th class="num" data-sort="number">Score</th>
@@ -22,8 +21,6 @@
         <th class="num" data-sort="number">Fail</th>
         <th class="num" data-sort="number">Error</th>
         <th class="status" data-sort="text">Recent</th>
-        <th class="status" data-sort="text">First seen</th>
-        <th class="status" data-sort="text">Last seen</th>
       {{ end }}
       {{ if failing }}
         <th class="num" data-sort="number">Failures</th>
@@ -32,8 +29,6 @@
         <th class="num" data-sort="number">Obs</th>
         <th class="num" data-sort="number">Runs</th>
         <th class="status" data-sort="text">Last</th>
-        <th class="status" data-sort="text">First seen</th>
-        <th class="status" data-sort="text">Last seen</th>
       {{ end }}
       {{ if slow }}
         <th class="num" data-sort="number">Max seconds</th>
@@ -41,15 +36,16 @@
         <th class="num" data-sort="number">Obs</th>
         <th class="num" data-sort="number">Runs</th>
         <th class="status" data-sort="text">Last</th>
-        <th class="status" data-sort="text">First seen</th>
-        <th class="status" data-sort="text">Last seen</th>
       {{ end }}
     </tr>
   </thead>
   <tbody>
     {{ for row in rows }}
       <tr>
-        <td class="test-col">{{ if row.test_link() }}<a href="{{ row.test_href() }}">{{ row.name }}</a>{{ else }}{{ row.name }}{{ end }}</td>
+        <td class="test-col">
+          <div class="test-name">{{ if row.test_link() }}<a href="{{ row.test_href() }}">{{ row.test_label }}</a>{{ else }}{{ row.test_label }}{{ end }}</div>
+          <div class="test-meta">First: {{ row.first_observed_at }} · Last: {{ row.last_observed_at }}</div>
+        </td>
         {{ if flaky }}
           <td class="num">{{ row.flake_score }}</td>
           <td class="num">{{ row.observations }}</td>
@@ -59,8 +55,6 @@
           <td class="num">{{ row.error_count }}</td>
           <td class="num">{{ row.transition_count }}</td>
           <td class="status">{{ row.last_status }}</td>
-          <td class="status">{{ row.first_observed_at }}</td>
-          <td class="status">{{ row.last_observed_at }}</td>
         {{ end }}
         {{ if healed }}
           <td class="num">{{ row.healed_score }}</td>
@@ -70,8 +64,6 @@
           <td class="num">{{ row.fail_count }}</td>
           <td class="num">{{ row.error_count }}</td>
           <td class="status">{{ row.recent_status }}</td>
-          <td class="status">{{ row.first_observed_at }}</td>
-          <td class="status">{{ row.last_observed_at }}</td>
         {{ end }}
         {{ if failing }}
           <td class="num">{{ row.failure_count }}</td>
@@ -80,8 +72,6 @@
           <td class="num">{{ row.observations }}</td>
           <td class="num">{{ row.run_count }}</td>
           <td class="status">{{ row.last_status }}</td>
-          <td class="status">{{ row.first_observed_at }}</td>
-          <td class="status">{{ row.last_observed_at }}</td>
         {{ end }}
         {{ if slow }}
           <td class="num">{{ row.max_duration }}</td>
@@ -89,10 +79,9 @@
           <td class="num">{{ row.observations }}</td>
           <td class="num">{{ row.run_count }}</td>
           <td class="status">{{ row.last_status }}</td>
-          <td class="status">{{ row.first_observed_at }}</td>
-          <td class="status">{{ row.last_observed_at }}</td>
         {{ end }}
       </tr>
     {{ end }}
   </tbody>
 </table>
+</div>

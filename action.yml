@@ -21,7 +21,7 @@ inputs:
   version:
     description: Flakewatch release version to install.
     required: false
-    default: v0.6.33
+    default: v0.6.34
   upload-artifact:
     description: Upload the generated HTML report as a GitHub Actions artifact.
     required: false
@@ -313,12 +313,8 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         REPORT_URL: ${{ steps.upload-flakewatch-report.outputs.artifact-url }}
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
-        REPORT_PATH: ${{ inputs.output }}
       run: |
         node <<'NODE'
-        const fs = require("fs")
-        const path = require("path")
-
         const markerStart = "<!-- flakewatch-report:start -->"
         const markerEnd = "<!-- flakewatch-report:end -->"
         const apiUrl = process.env.GITHUB_API_URL || "https://api.github.com"
@@ -329,24 +325,11 @@ runs:
         const reportUrl = process.env.REPORT_URL
         const bannerUrl = "https://raw.githubusercontent.com/komagata/flakewatch/main/assets/flakewatch-report.svg"
 
-        function reportMetrics() {
-          const workspace = process.env.GITHUB_WORKSPACE || process.cwd()
-          const reportPath = path.isAbsolute(process.env.REPORT_PATH)
-            ? process.env.REPORT_PATH
-            : path.join(workspace, process.env.REPORT_PATH)
-          const html = fs.existsSync(reportPath) ? fs.readFileSync(reportPath, "utf8") : ""
-          const metrics = Array.from(html.matchAll(/<div class="metric"><strong>(.*?)<\/strong>(.*?)<\/div>/g))
-            .map((match) => `- ${match[2].trim()}: ${match[1].trim()}`)
-
-          return metrics.length > 0 ? ["", ...metrics].join("\n") : ""
-        }
-
         const block = [
           markerStart,
           "## Flakewatch Report",
           "",
           `<a href="${reportUrl}" target="_blank" rel="noopener noreferrer"><img src="${bannerUrl}" alt="Open ${artifactName}" width="150"></a>`,
-          reportMetrics(),
           markerEnd
         ].join("\n")
 

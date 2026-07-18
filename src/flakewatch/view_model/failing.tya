@@ -20,8 +20,19 @@ class Failing extends Row
   # @type Int
   observations: 0
 
+  # Failing.test_label stores the full test name shown in the first column.
+  # @type String
+  test_label: ""
+
   initialize: row, source_base_url, source_root, source_cache, source_line_cache ->
     super(row, source_base_url, source_root, source_cache, source_line_cache)
+    self.test_label = row["name"]
+    self.name = row["name"]
+    self.run_count = row["run_count"]
+    if self.first_observed_at == ""
+      self.first_observed_at = "unknown"
+    if self.last_observed_at == ""
+      self.last_observed_at = "unknown"
     self.failure_count = row["failure_count"]
     self.fail_count = row["fail_count"]
     self.error_count = row["error_count"]

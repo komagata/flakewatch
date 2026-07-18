@@ -45,9 +45,17 @@ class Row
     self.last_observed_at = display_time(row["last_observed_at"])
 
   display_time: value ->
-    if value == nil or value == ""
+    text_value = "{value}"
+    if value == nil or text_value == "" or text_value == "nil"
       return "unknown"
-    value
+    out = text_value.replace("T", " ")
+    if out.contains("+")
+      out = out.split("+")[0]
+    if out.contains("Z")
+      out = out.split("Z")[0]
+    if out.len() > 16
+      out = out.slice(0, 16)
+    out
 
   test_href: -> test_link_value().href
 

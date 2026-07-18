@@ -45,8 +45,8 @@ The report contains:
 - source links: file links from JUnit XML, with inferred Ruby test line links
   when the XML omits line numbers
 - run summary: total tests, observations, test runs, and failures/errors
-- observation columns: each row shows distinct runs plus first and last known
-  observation timestamps
+- observation metadata: each row shows distinct runs plus first and last known
+  observation timestamps under the test name
 
 ## GitHub Actions
 
@@ -96,7 +96,7 @@ jobs:
 
       - name: Generate flakewatch report
         if: always()
-        uses: komagata/flakewatch@v0.6.33
+        uses: komagata/flakewatch@v0.6.34
 ```
 
 By default, the action:
@@ -155,7 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: komagata/flakewatch@v0.6.33
+      - uses: komagata/flakewatch@v0.6.34
         with:
           junit-artifact-pattern: junit-*
 ```
@@ -178,7 +178,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.33
+  uses: komagata/flakewatch@v0.6.34
   with:
     history-branch: flakewatch-data
 ```
@@ -205,7 +205,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.33
+  uses: komagata/flakewatch@v0.6.34
   with:
     history-branch: flakewatch-data
     history-write: true
@@ -223,7 +223,7 @@ visible in the job log.
 | `output` | `flakewatch.html` | HTML report output path. |
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
-| `version` | `v0.6.33` | Flakewatch release version to install. |
+| `version` | `v0.6.34` | Flakewatch release version to install. |
 | `upload-artifact` | `true` | Upload the generated HTML report as a GitHub Actions artifact. |
 | `artifact-name` | `flakewatch.html` | GitHub Actions artifact name for the generated HTML report. |
 | `junit-artifact-pattern` | empty | JUnit XML artifact name pattern to download, for example `junit-*`. When set, Flakewatch reads `download-artifact-path/**/*.xml`. |
