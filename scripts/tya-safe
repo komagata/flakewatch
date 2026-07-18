@@ -6,8 +6,16 @@ cd "$repo_root" || exit 1
 
 mkdir -p tmp
 
+if ! command -v systemd-run >/dev/null 2>&1; then
+  printf 'systemd-run is required for memory-limited Tya execution\n' >&2
+  exit 127
+fi
+
 timeout_seconds="${TYA_SAFE_TIMEOUT:-20}"
-stamp="$(date +%Y%m%d-%H%M%S)"
+memory_max="${TYA_MEMORY_MAX:-4G}"
+memory_swap_max="${TYA_MEMORY_SWAP_MAX:-1G}"
+stamp="$(date +%Y%m%d-%H%M%S)-$$"
+unit_name="flakewatch-tya-safe-${stamp}.service"
 log_path="tmp/tya-safe-${stamp}.log"
 status_path="tmp/tya-safe-${stamp}.status"
 done_path="tmp/tya-safe-${stamp}.done"
@@ -18,18 +26,17 @@ done_path="tmp/tya-safe-${stamp}.done"
   printf 'command:'
   printf ' %q' tya "$@"
   printf '\n\n'
-  printf 'isolation: setsid, stdin=/dev/null, stdout/stderr=file\n'
+  printf 'isolation: systemd unit=%s, stdin=/dev/null, stdout/stderr=file\n' "$unit_name"
+  printf 'memory: max=%s, swap_max=%s\n' "$memory_max" "$memory_swap_max"
   printf '\n'
 } >"$log_path"
 
 (
   set +e
   exec </dev/null
-  if command -v setsid >/dev/null 2>&1; then
-    setsid timeout --foreground --kill-after=3s "$timeout_seconds" tya "$@" >>"$log_path" 2>&1
-  else
+  systemd-run --user --wait --pipe --collect --unit="$unit_name" --working-directory="$repo_root" \
+    -p "MemoryMax=$memory_max" -p "MemorySwapMax=$memory_swap_max" \
     timeout --kill-after=3s "$timeout_seconds" tya "$@" >>"$log_path" 2>&1
-  fi
   status=$?
 
   printf '%s\n' "$status" >"$status_path"

@@ -11,9 +11,17 @@ if ! command -v tmux >/dev/null 2>&1; then
   exit 127
 fi
 
+if ! command -v systemd-run >/dev/null 2>&1; then
+  printf 'systemd-run is required for memory-limited Tya execution\n' >&2
+  exit 127
+fi
+
 timeout_seconds="${TYA_SAFE_TIMEOUT:-20}"
+memory_max="${TYA_MEMORY_MAX:-4G}"
+memory_swap_max="${TYA_MEMORY_SWAP_MAX:-1G}"
 stamp="$(date +%Y%m%d-%H%M%S)-$$"
 session_name="flakewatch-tya-${stamp}"
+unit_name="${session_name}.service"
 log_path="tmp/tya-tmux-${stamp}.log"
 status_path="tmp/tya-tmux-${stamp}.status"
 done_path="tmp/tya-tmux-${stamp}.done"
@@ -26,7 +34,8 @@ runner_path="tmp/tya-tmux-${stamp}.sh"
   printf 'command:'
   printf ' %q' tya "$@"
   printf '\n\n'
-  printf 'isolation: detached tmux session, stdin=/dev/null, stdout/stderr=file\n'
+  printf 'isolation: detached tmux session, systemd unit=%s, stdin=/dev/null, stdout/stderr=file\n' "$unit_name"
+  printf 'memory: max=%s, swap_max=%s\n' "$memory_max" "$memory_swap_max"
   printf '\n'
 } >"$log_path"
 
@@ -35,7 +44,8 @@ runner_path="tmp/tya-tmux-${stamp}.sh"
   printf 'set +e\n'
   printf 'cd %q || exit 1\n' "$repo_root"
   printf 'exec </dev/null\n'
-  printf 'timeout --kill-after=3s %q tya' "$timeout_seconds"
+  printf 'systemd-run --user --wait --pipe --collect --unit=%q --working-directory=%q -p %q -p %q timeout --kill-after=3s %q tya' \
+    "$unit_name" "$repo_root" "MemoryMax=$memory_max" "MemorySwapMax=$memory_swap_max" "$timeout_seconds"
   for arg in "$@"; do
     printf ' %q' "$arg"
   done
