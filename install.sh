@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-VERSION="${FLAKEWATCH_VERSION:-v0.6.35}"
+VERSION="${FLAKEWATCH_VERSION:-v0.6.36}"
 INSTALL_DIR="${FLAKEWATCH_INSTALL_DIR:-/usr/local/bin}"
 TMP_DIR="${TMPDIR:-/tmp}"
 

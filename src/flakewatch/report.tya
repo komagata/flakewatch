@@ -317,6 +317,11 @@ class Report
       if row["flake_score"] > 0 and recent_all_passed(row["recent_passish"], 10)
         row["healed_score"] = row["flake_score"]
         row["flake_score"] = 0
+      row["recent_passish"] = []
+      row["sha_failure_counts"] = {}
+      row["sha_pass_counts"] = {}
+      row["sha_previous_passish"] = {}
+      row["sha_transition_counts"] = {}
       rows.push(row)
     rows
 

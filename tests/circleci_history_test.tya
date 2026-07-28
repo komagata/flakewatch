@@ -98,6 +98,50 @@ class CircleciHistoryTest extends TestCase
       "feature branch excluded"
     )
 
+  test_report_discards_internal_observation_state_after_scoring: ->
+    items = []
+    items.push(
+      {
+        classname: "pkg.Test",
+        name: "memory",
+        status: "passed",
+        duration: 0.1,
+        sha: "abc"
+      }
+    )
+    items.push(
+      {
+        classname: "pkg.Test",
+        name: "memory",
+        status: "failed",
+        duration: 0.1,
+        sha: "abc"
+      }
+    )
+    row = flakewatch.Report().rows_from_items(items)[0]
+    assert_equal(65, row["flake_score"], "score retained")
+    assert_equal(0, row["recent_passish"].len(), "recent statuses discarded")
+    assert_equal(
+      0,
+      row["sha_pass_counts"].keys().len(),
+      "SHA pass counts discarded"
+    )
+    assert_equal(
+      0,
+      row["sha_failure_counts"].keys().len(),
+      "SHA failure counts discarded"
+    )
+    assert_equal(
+      0,
+      row["sha_previous_passish"].keys().len(),
+      "SHA status discarded"
+    )
+    assert_equal(
+      0,
+      row["sha_transition_counts"].keys().len(),
+      "SHA transitions discarded"
+    )
+
   test_report_enriches_current_junit_with_sha_for_flake_detection: ->
     history_path = "tmp/flakewatch-current-sha-history.jsonl"
     flakewatch
