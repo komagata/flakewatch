@@ -101,7 +101,7 @@ jobs:
 
       - name: Generate flakewatch report
         if: always()
-        uses: komagata/flakewatch@v0.6.36
+        uses: komagata/flakewatch@v0.6.37
 ```
 
 By default, the action:
@@ -160,7 +160,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: komagata/flakewatch@v0.6.36
+      - uses: komagata/flakewatch@v0.6.37
         with:
           junit-artifact-pattern: junit-*
 ```
@@ -183,7 +183,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.36
+  uses: komagata/flakewatch@v0.6.37
   with:
     history-branch: flakewatch-data
 ```
@@ -217,7 +217,7 @@ permissions:
 
 - name: Generate flakewatch report
   if: always()
-  uses: komagata/flakewatch@v0.6.36
+  uses: komagata/flakewatch@v0.6.37
   with:
     history-branch: flakewatch-data
     analysis-branch: main
@@ -235,7 +235,7 @@ failure counts from the selected branch scope appear separately under
 | `output` | `flakewatch.html` | HTML report output path. |
 | `source-base-url` | current GitHub commit URL | Base URL for source links. |
 | `source-root` | `.` | Local source root used to infer Ruby test line links. |
-| `version` | `v0.6.36` | Flakewatch release version to install. |
+| `version` | `v0.6.37` | Flakewatch release version to install. |
 | `upload-artifact` | `true` | Upload the generated HTML report as a GitHub Actions artifact. |
 | `artifact-name` | `flakewatch.html` | GitHub Actions artifact name for the generated HTML report. |
 | `junit-artifact-pattern` | empty | JUnit XML artifact name pattern to download, for example `junit-*`. When set, Flakewatch reads `download-artifact-path/**/*.xml`. |

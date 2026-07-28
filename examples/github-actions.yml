@@ -24,7 +24,7 @@ jobs:
 
       - name: Generate flakewatch report
         if: always()
-        uses: komagata/flakewatch@v0.6.36
+        uses: komagata/flakewatch@v0.6.37
         with:
           history-branch: flakewatch-data
 
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Generate flakewatch report
-        uses: komagata/flakewatch@v0.6.36
+        uses: komagata/flakewatch@v0.6.37
         with:
           download-artifacts: true
           download-artifact-pattern: junit-*
