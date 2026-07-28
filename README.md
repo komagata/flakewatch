@@ -27,18 +27,23 @@ flakewatch \
   --junit="test/reports/**/*.xml" \
   --history="tmp/flakewatch/history/**/*.jsonl" \
   --history-output="tmp/flakewatch/history/run-$(date -u +%Y%m%d%H%M%S).jsonl" \
+  --sha="$(git rev-parse HEAD)" \
+  --branch="$(git branch --show-current)" \
   --output="tmp/flakewatch/report.html"
 ```
 
 Open `tmp/flakewatch/report.html` in a browser to inspect the report.
+The SHA is required for same-commit flaky detection; GitHub Actions supplies
+the SHA and branch metadata automatically.
 
 The report contains:
 
-- flaky tests: tests that appear with both passing and failing/error outcomes
-  across the provided JUnit files
+- flaky tests: tests that pass and fail/error on the same commit within the
+  retained history
 - healed candidates: tests that had past pass/fail variation but whose 10 most
   recent observations are all passing
-- failing tests: tests ranked by total failure and error observations
+- failing tests: failures and errors from the current JUnit input
+- most failed tests: historical tests ranked by failure and error observations
 - slow tests: tests ranked by their maximum and average recorded duration
 - sortable tables: click columns such as `Failures`, `Max seconds`, or
   `Avg seconds` to reorder the visible rows
@@ -184,19 +189,26 @@ permissions:
 ```
 
 When `history-branch` is set, Flakewatch reads `history/**/*.jsonl` from that
-branch before generating the HTML report. Trusted branch runs then write the
-current run to a file such as:
+branch before generating the HTML report. It stores every JUnit status, not
+only failures, because both passing and failing observations are required to
+identify a flaky test. Trusted runs write the current run to a file such as:
 
 ```text
 history/2026/05/18/run-123456789-attempt-1.jsonl
 ```
 
-The default `history-write: auto` reads history for pull request reports, but
-writes history only outside `pull_request` events. This lets pull request
-reports include past runs without letting untrusted PR workflows update the
-persistent history branch.
+The default `history-write: auto` writes push runs from every branch and pull
+request runs whose head branch belongs to the same repository. Pull requests
+from forks read history and generate reports, but do not write to the
+persistent branch. The action emits a notice when it skips a fork write.
 
-If you want pull request runs to write history too, opt in explicitly:
+History is retained for 14 calendar days, including the current day. A test is
+classified as flaky only when it both passes and fails or errors on the same
+non-empty commit SHA during that window. A pass on one commit and failure on a
+different commit is not considered flaky.
+
+The default analysis includes all branches. Select one exact branch when a
+report should use only that branch's history:
 
 ```yaml
 permissions:
@@ -208,12 +220,12 @@ permissions:
   uses: komagata/flakewatch@v0.6.34
   with:
     history-branch: flakewatch-data
-    history-write: true
+    analysis-branch: main
 ```
 
-With the default `history-write: auto`, pull request runs that set
-`history-branch` emit a GitHub Actions notice so the skipped history write is
-visible in the job log.
+`Failing Tests` shows only the current workflow's failures. Historical
+failure counts from the selected branch scope appear separately under
+`Most Failed Tests`.
 
 ### Action Inputs
 
@@ -234,7 +246,8 @@ visible in the job log.
 | `update-pr-description` | `true` | Add or update a Flakewatch report link in the pull request description. |
 | `add-job-summary` | `true` | Add a Flakewatch report link to the GitHub Actions job summary. |
 | `history-branch` | empty | Git branch used to persist JSONL test history. |
-| `history-write` | `auto` | Write JSONL history to `history-branch`. `auto` reads history for all events and writes outside pull request events. |
+| `history-write` | `auto` | Write JSONL history to `history-branch`. `auto` writes pushes and same-repository pull requests, but not fork pull requests. |
+| `analysis-branch` | `*` | Analyze history from all branches (`*`) or one exact branch name. |
 
 ## Command
 
@@ -243,6 +256,7 @@ flakewatch \
   --junit="test-results/**/*.xml" \
   --history="flakewatch-history/history/**/*.jsonl" \
   --history-output="flakewatch-history/history/run.jsonl" \
+  --analysis-branch="*" \
   --output=flakewatch.html \
   --source-base-url="https://github.com/OWNER/REPO/blob/COMMIT_SHA" \
   --source-root="."

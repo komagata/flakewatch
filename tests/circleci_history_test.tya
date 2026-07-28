@@ -1,0 +1,241 @@
+import os
+import unittest/* as *
+import flakewatch/*
+
+class CircleciHistoryTest extends TestCase
+  test_cli_writes_pull_request_head_branch: ->
+    os.Os.setenv("GITHUB_REF_NAME", "123/merge")
+    os.Os.setenv("GITHUB_HEAD_REF", "feature/history")
+    output_path = "tmp/flakewatch-pr-history.jsonl"
+    html_path = "tmp/flakewatch-pr-history.html"
+    outcome = flakewatch
+      .Application()
+      .run(["--junit=tests/fixtures/junit/run1.xml", "--output=" + html_path, "--history-output=" + output_path])
+    os.Os.unsetenv("GITHUB_REF_NAME")
+    os.Os.unsetenv("GITHUB_HEAD_REF")
+    assert_equal(0, outcome.status, "status")
+    items = flakewatch.History().items_from_jsonl([output_path])
+    assert_equal("feature/history", items[0]["branch"], "pull request branch")
+
+  test_history_collects_every_status_with_branch_and_sha: ->
+    items = flakewatch
+      .History()
+      .items_from_junit({ junit: ["tests/fixtures/junit/run1.xml", "tests/fixtures/junit/run2.xml"], repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "abc", branch: "feature", event: "push" })
+    assert_equal(7, items.len(), "all tests")
+    assert_equal("passed", items[0]["status"], "passed")
+    assert_equal("failed", items[1]["status"], "failed")
+    assert_equal("skipped", items[2]["status"], "skipped")
+    assert_equal("error", items[6]["status"], "error")
+    assert_equal("abc", items[0]["sha"], "sha")
+    assert_equal("feature", items[0]["branch"], "branch")
+
+  test_report_analysis_branch_filters_flaky_history: ->
+    main_path = "tmp/flakewatch-main-history.jsonl"
+    feature_path = "tmp/flakewatch-feature-history.jsonl"
+    history = flakewatch.History()
+    history.export_file(
+      {
+        output: main_path,
+        junit: [
+          "tests/fixtures/junit/run1.xml"
+        ],
+        repo: "repo",
+        workflow: "ci",
+        run_id: "1",
+        run_attempt: "1",
+        job: "test",
+        sha: "abc",
+        branch: "main",
+        event: "push"
+      }
+    )
+    history.export_file(
+      {
+        output: feature_path,
+        junit: [
+          "tests/fixtures/junit/run2.xml"
+        ],
+        repo: "repo",
+        workflow: "ci",
+        run_id: "2",
+        run_attempt: "1",
+        job: "test",
+        sha: "abc",
+        branch: "feature",
+        event: "push"
+      }
+    )
+    report = flakewatch.Report()
+    all_html = report.render(
+      {
+        junit: [],
+        history: [
+          main_path,
+          feature_path
+        ],
+        analysis_branch: "*",
+        source_base_url: "",
+        source_root: "."
+      }
+    )
+    main_html = report.render(
+      {
+        junit: [],
+        history: [
+          main_path,
+          feature_path
+        ],
+        analysis_branch: "main",
+        source_base_url: "",
+        source_root: "."
+      }
+    )
+    all_flaky = all_html.split("<h2>Flaky Tests</h2>")[1].split("<h2>Healed Candidates</h2>")[0]
+    main_flaky = main_html.split("<h2>Flaky Tests</h2>")[1].split("<h2>Healed Candidates</h2>")[0]
+    assert(all_flaky.contains("pkg.FlakyTest.alternates"), "all branches")
+    assert(
+      not main_flaky.contains("pkg.FlakyTest.alternates"),
+      "feature branch excluded"
+    )
+
+  test_report_enriches_current_junit_with_sha_for_flake_detection: ->
+    history_path = "tmp/flakewatch-current-sha-history.jsonl"
+    flakewatch
+      .History()
+      .export_file({ output: history_path, junit: ["tests/fixtures/junit/run1.xml"], repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "abc", branch: "main", event: "push" })
+    html = flakewatch
+      .Report()
+      .render({ junit: ["tests/fixtures/junit/run2.xml"], history: [history_path], analysis_branch: "main", sha: "abc", branch: "main", run_id: "2", run_attempt: "1", job: "test", source_base_url: "", source_root: "." })
+    flaky_section = html.split("<h2>Flaky Tests</h2>")[1].split("<h2>Healed Candidates</h2>")[0]
+    assert(
+      flaky_section.contains("pkg.FlakyTest.alternates"),
+      "current JUnit uses SHA"
+    )
+
+  test_report_filters_history_by_exact_branch_or_all: ->
+    items = []
+    items.push({ branch: "main", name: "main" })
+    items.push({ branch: "feature", name: "feature" })
+    items.push({ branch: "", name: "legacy" })
+    report = flakewatch.Report()
+    all_items = report.items_for_branch(items, "*")
+    main_items = report.items_for_branch(items, "main")
+    assert_equal(3, all_items.len(), "all branches")
+    assert_equal(1, main_items.len(), "exact branch")
+    assert_equal("main", main_items[0]["name"], "main record")
+
+  test_report_flake_score_uses_only_qualifying_sha: ->
+    items = []
+    items.push(
+      {
+        classname: "pkg.Test",
+        name: "score",
+        status: "passed",
+        duration: 0.1,
+        sha: "abc"
+      }
+    )
+    items.push(
+      {
+        classname: "pkg.Test",
+        name: "score",
+        status: "failed",
+        duration: 0.1,
+        sha: "abc"
+      }
+    )
+    items.push(
+      {
+        classname: "pkg.Test",
+        name: "score",
+        status: "failed",
+        duration: 0.1,
+        sha: "def"
+      }
+    )
+    rows = flakewatch.Report().rows_from_items(items)
+    assert_equal(65, rows[0]["flake_score"], "qualifying SHA score")
+
+  test_report_flaky_requires_pass_and_failure_on_same_sha: ->
+    same_sha = []
+    same_sha.push(
+      {
+        classname: "pkg.Test",
+        name: "same",
+        status: "passed",
+        duration: 0.1,
+        sha: "abc"
+      }
+    )
+    same_sha.push(
+      {
+        classname: "pkg.Test",
+        name: "same",
+        status: "failed",
+        duration: 0.1,
+        sha: "abc"
+      }
+    )
+    different_sha = []
+    different_sha.push(
+      {
+        classname: "pkg.Test",
+        name: "different",
+        status: "passed",
+        duration: 0.1,
+        sha: "abc"
+      }
+    )
+    different_sha.push(
+      {
+        classname: "pkg.Test",
+        name: "different",
+        status: "failed",
+        duration: 0.1,
+        sha: "def"
+      }
+    )
+    skipped_and_failed = []
+    skipped_and_failed.push(
+      {
+        classname: "pkg.Test",
+        name: "skipped",
+        status: "skipped",
+        duration: 0.1,
+        sha: "abc"
+      }
+    )
+    skipped_and_failed.push(
+      {
+        classname: "pkg.Test",
+        name: "skipped",
+        status: "failed",
+        duration: 0.1,
+        sha: "abc"
+      }
+    )
+    same_rows = flakewatch.Report().rows_from_items(same_sha)
+    different_rows = flakewatch.Report().rows_from_items(different_sha)
+    skipped_rows = flakewatch.Report().rows_from_items(skipped_and_failed)
+    assert(same_rows[0]["flake_score"] > 0, "same SHA is flaky")
+    assert_equal(0, different_rows[0]["flake_score"], "different SHAs")
+    assert_equal(0, skipped_rows[0]["flake_score"], "skipped is not pass")
+
+  test_report_separates_current_and_historical_failures: ->
+    history_path = "tmp/flakewatch-separated-failures.jsonl"
+    flakewatch
+      .History()
+      .export_file({ output: history_path, junit: ["tests/fixtures/junit/run1.xml"], repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "abc", branch: "main", event: "push" })
+    html = flakewatch
+      .Report()
+      .render({ junit: ["tests/fixtures/junit/no_time.xml"], history: [history_path], analysis_branch: "main", sha: "def", branch: "main", run_id: "2", run_attempt: "1", job: "test", source_base_url: "", source_root: "." })
+    current_failures = html.split("<h2>Failing Tests</h2>")[1].split("<h2>Most Failed Tests</h2>")[0]
+    historical_failures = html.split("<h2>Most Failed Tests</h2>")[1].split("<h2>Slow Tests</h2>")[0]
+    assert(
+      not current_failures.contains("pkg.AlwaysFailTest.fails"),
+      "history excluded from current failures"
+    )
+    assert(
+      historical_failures.contains("pkg.AlwaysFailTest.fails"),
+      "history shown separately"
+    )

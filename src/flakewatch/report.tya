@@ -41,6 +41,10 @@ class Report
           last_status: ""
           previous_passish: ""
           recent_passish: []
+          sha_failure_counts: {}
+          sha_pass_counts: {}
+          sha_previous_passish: {}
+          sha_transition_counts: {}
         by_test[key] = row
       row = by_test[key]
       item_file = text(item["file"])
@@ -49,6 +53,29 @@ class Report
       if row["line"] == "" and item_file != ""
         row["line"] = text(item["line"])
       status = text(item["status"])
+      sha = text(item["sha"])
+      if sha != ""
+        if row["sha_pass_counts"][sha] == nil
+          row["sha_pass_counts"][sha] = 0
+          row["sha_failure_counts"][sha] = 0
+          row["sha_transition_counts"][sha] = 0
+          row["sha_previous_passish"][sha] = ""
+        if status == "passed"
+          if (
+            row["sha_previous_passish"][sha] != "" and row["sha_previous_passish"][sha] != "true"
+          )
+            row["sha_transition_counts"][sha] = row["sha_transition_counts"][sha]
+              + 1
+          row["sha_previous_passish"][sha] = "true"
+          row["sha_pass_counts"][sha] = row["sha_pass_counts"][sha] + 1
+        elseif status == "failed" or status == "error"
+          if (
+            row["sha_previous_passish"][sha] != "" and row["sha_previous_passish"][sha] != "false"
+          )
+            row["sha_transition_counts"][sha] = row["sha_transition_counts"][sha]
+              + 1
+          row["sha_previous_passish"][sha] = "false"
+          row["sha_failure_counts"][sha] = row["sha_failure_counts"][sha] + 1
       passish = "false"
       if status == "passed" or status == "skipped"
         passish = "true"
@@ -117,10 +144,38 @@ class Report
       out.push(item)
     out
 
+  enrich_items: items, opts ->
+    for item in items
+      item["repo"] = text(opts["repo"])
+      item["workflow"] = text(opts["workflow"])
+      item["run_id"] = text(opts["run_id"])
+      item["run_attempt"] = text(opts["run_attempt"])
+      item["job"] = text(opts["job"])
+      item["sha"] = text(opts["sha"])
+      item["branch"] = text(opts["branch"])
+      item["event"] = text(opts["event"])
+      source_id = text(item["source_id"])
+      if item["run_id"] != ""
+        item["source_id"] = item["run_id"]
+          + "-"
+          + item["run_attempt"]
+          + "-"
+          + source_id
+    items
+
   history_items: patterns ->
     if patterns.len() == 0
       return []
     history.items_from_jsonl(patterns)
+
+  items_for_branch: items, branch ->
+    if branch == "*"
+      return items
+    out = []
+    for item in items
+      if text(item["branch"]) == branch
+        out.push(item)
+    out
 
   junit_items: patterns -> junit_items_from_files(junit.files(patterns))
 
@@ -179,73 +234,23 @@ class Report
     source_root = opts["source_root"]
     if source_root == nil
       source_root = "."
-    past_items = history_items(history_patterns)
+    analysis_branch = opts["analysis_branch"]
+    if analysis_branch == nil or analysis_branch == ""
+      analysis_branch = "*"
+    past_items = items_for_branch(
+      history_items(history_patterns),
+      analysis_branch
+    )
     junit_files = junit.files(junit_patterns)
-    current_items = junit_items_from_files(junit_files)
-    rows = rows_from_items(past_items)
+    current_items = enrich_items(junit_items_from_files(junit_files), opts)
+    analysis_items = []
+    for item in past_items
+      analysis_items.push(item)
+    for item in items_for_branch(current_items, analysis_branch)
+      analysis_items.push(item)
+    rows = rows_from_items(analysis_items)
     current_rows = rows_from_items(current_items)
-    for current_row in current_rows
-      matched = nil
-      for row in rows
-        if row["name"] == current_row["name"]
-          matched = row
-      if matched == nil
-        rows.push(current_row)
-      else
-        for passish in current_row["recent_passish"]
-          if (
-            matched["previous_passish"] != "" and matched["previous_passish"] != passish
-          )
-            matched["transition_count"] = matched["transition_count"] + 1
-          matched["previous_passish"] = passish
-          matched["recent_passish"].push(passish)
-        if matched["file"] == "" and current_row["file"] != ""
-          matched["file"] = current_row["file"]
-        if matched["line"] == "" and current_row["line"] != ""
-          matched["line"] = current_row["line"]
-        matched["observations"] = matched["observations"]
-          + current_row["observations"]
-        matched["pass_count"] = matched["pass_count"]
-          + current_row["pass_count"]
-        matched["fail_count"] = matched["fail_count"]
-          + current_row["fail_count"]
-        matched["error_count"] = matched["error_count"]
-          + current_row["error_count"]
-        matched["skipped_count"] = matched["skipped_count"]
-          + current_row["skipped_count"]
-        matched["failure_count"] = matched["failure_count"]
-          + current_row["failure_count"]
-        matched["total_duration"] = matched["total_duration"]
-          + current_row["total_duration"]
-        if current_row["max_duration"] > matched["max_duration"]
-          matched["max_duration"] = current_row["max_duration"]
-        for source_id in current_row["source_ids"].keys()
-          if matched["source_ids"][source_id] == nil
-            matched["source_ids"][source_id] = "true"
-            matched["run_count"] = matched["run_count"] + 1
-        if (
-          current_row["first_observed_at"] != "" and (matched["first_observed_at"] == "" or current_row["first_observed_at"] < matched["first_observed_at"])
-        )
-          matched["first_observed_at"] = current_row["first_observed_at"]
-        if (
-          current_row["last_observed_at"] != "" and (matched["last_observed_at"] == "" or current_row["last_observed_at"] > matched["last_observed_at"])
-        )
-          matched["last_observed_at"] = current_row["last_observed_at"]
-        matched["last_status"] = current_row["last_status"]
-        matched["avg_duration"] = matched["total_duration"]
-          / matched["observations"]
-        non_pass = matched["fail_count"] + matched["error_count"]
-        matched["flake_score"] = 0
-        if matched["pass_count"] > 0 and non_pass > 0
-          matched["flake_score"] = 50
-            + matched["transition_count"] * 10
-            + non_pass * 5
-        matched["healed_score"] = 0
-        if (
-          matched["flake_score"] > 0 and recent_all_passed(matched["recent_passish"], 10)
-        )
-          matched["healed_score"] = matched["flake_score"]
-          matched["flake_score"] = 0
+    history_rows = rows_from_items(past_items)
     notices = []
     if junit_patterns.len() > 0 and junit_files.len() == 0
       if past_items.len() > 0
@@ -256,7 +261,14 @@ class Report
         notices.push(
           "No JUnit XML files or history records were found. Check the JUnit artifact pattern and test report output path."
         )
-    render_rows(rows, source_base_url, source_root, notices)
+    render_scoped_rows(
+      rows,
+      current_rows,
+      history_rows,
+      source_base_url,
+      source_root,
+      notices
+    )
 
   render_file: opts ->
     html = render(opts)
@@ -281,15 +293,26 @@ class Report
     )
     render_page(data)
 
+  render_scoped_rows: rows, current_rows, history_rows, source_base_url, source_root, notices ->
+    source_cache = {}
+    source_line_cache = {}
+    scopes = { analysis: rows, current: current_rows, history: history_rows }
+    data = self.template_data_scoped(
+      scopes,
+      source_base_url,
+      source_root,
+      source_cache,
+      source_line_cache,
+      notices
+    )
+    render_page(data)
+
   rows_from_by_test: by_test ->
     rows = []
     for key in by_test.keys()
       row = by_test[key]
       row["avg_duration"] = row["total_duration"] / row["observations"]
-      row["flake_score"] = 0
-      non_pass = row["fail_count"] + row["error_count"]
-      if row["pass_count"] > 0 and non_pass > 0
-        row["flake_score"] = 50 + row["transition_count"] * 10 + non_pass * 5
+      row["flake_score"] = same_sha_flake_score(row)
       row["healed_score"] = 0
       if row["flake_score"] > 0 and recent_all_passed(row["recent_passish"], 10)
         row["healed_score"] = row["flake_score"]
@@ -302,6 +325,17 @@ class Report
     apply_items(by_test, items)
     rows_from_by_test(by_test)
 
+  same_sha_flake_score: row ->
+    score = 0
+    for sha in row["sha_pass_counts"].keys()
+      if row["sha_pass_counts"][sha] > 0 and row["sha_failure_counts"][sha] > 0
+        candidate = 50
+          + row["sha_transition_counts"][sha] * 10
+          + row["sha_failure_counts"][sha] * 5
+        if candidate > score
+          score = candidate
+    score
+
   section: kind, title, rows, empty_message ->
     out =
       kind: kind
@@ -311,7 +345,7 @@ class Report
       has_rows: rows.len() > 0
       flaky: kind == "flaky"
       healed: kind == "healed"
-      failing: kind == "failing"
+      failing: kind == "failing" or kind == "most_failing"
       slow: kind == "slow"
     out
 
@@ -323,8 +357,22 @@ class Report
     count
 
   template_data: rows, source_base_url, source_root, source_cache, source_line_cache, notices ->
+    scopes = { analysis: rows, current: rows, history: rows }
+    template_data_scoped(
+      scopes,
+      source_base_url,
+      source_root,
+      source_cache,
+      source_line_cache,
+      notices
+    )
+
+  template_data_scoped: scopes, source_base_url, source_root, source_cache, source_line_cache, notices ->
     source_cache = {}
     source_line_cache = {}
+    rows = scopes["analysis"]
+    current_rows = scopes["current"]
+    history_rows = scopes["history"]
     total = 0
     observations = 0
     failures = 0
@@ -393,12 +441,23 @@ class Report
           "failing",
           "Failing Tests",
           build_rows(
-            top_rows(rows, "failure_count", 20),
+            top_rows(current_rows, "failure_count", 20),
             "failure_count",
             Failing,
             links
           ),
-          "No failing tests found in these JUnit files."
+          "No failing tests found in the current JUnit files."
+        ),
+        section(
+          "most_failing",
+          "Most Failed Tests",
+          build_rows(
+            top_rows(history_rows, "failure_count", 20),
+            "failure_count",
+            Failing,
+            links
+          ),
+          "No historical failures found in the selected history."
         ),
         section(
           "slow",

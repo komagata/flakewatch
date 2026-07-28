@@ -63,9 +63,13 @@ inputs:
     required: false
     default: ""
   history-write:
-    description: Write JSONL history to history-branch. Use auto to write only outside pull_request events.
+    description: Write JSONL history to history-branch. Auto writes pushes and same-repository pull requests, but not fork pull requests.
     required: false
     default: auto
+  analysis-branch:
+    description: Branch whose history is analyzed, or * for all branches.
+    required: false
+    default: "*"
 
 runs:
   using: composite
@@ -109,11 +113,44 @@ runs:
         fi
 
         mkdir -p history
-        find history -name '*.jsonl' -type f | sort | awk '{ files[NR] = $0 } END { for (i = 1; i <= NR - 1; i++) print files[i] }' | xargs -r rm -f
+        cutoff="$(date -u -d '13 days ago' +%Y%m%d)"
+        find history -mindepth 4 -maxdepth 4 -name '*.jsonl' -type f -print0 |
+          while IFS= read -r -d '' history_file; do
+            relative="${history_file#history/}"
+            year="${relative%%/*}"
+            relative="${relative#*/}"
+            month="${relative%%/*}"
+            relative="${relative#*/}"
+            day="${relative%%/*}"
+            date_key="${year}${month}${day}"
+            if [[ "$date_key" =~ ^[0-9]{8}$ ]] && ((10#$date_key < 10#$cutoff)); then
+              rm -f -- "$history_file"
+            fi
+          done
         find history -name '*.jsonl' -type f -print0 |
           xargs -0 -r perl -CS -i -pe 's/&/\\u0026/g; s/([^\x00-\x7F])/sprintf("\\u%04x", ord($1))/ge'
         echo "dir=${history_dir}" >> "$GITHUB_OUTPUT"
         echo "pattern=${history_dir}/history/**/*.jsonl" >> "$GITHUB_OUTPUT"
+
+    - name: Decide whether to write flakewatch history
+      id: flakewatch-history-policy
+      if: inputs.history-branch != ''
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        REPOSITORY: ${{ github.repository }}
+        WRITE_MODE: ${{ inputs.history-write }}
+      run: |
+        write=false
+        if [ "$WRITE_MODE" = "true" ]; then
+          write=true
+        elif [ "$WRITE_MODE" = "auto" ]; then
+          if [ "$EVENT_NAME" != "pull_request" ] || [ "$HEAD_REPOSITORY" = "$REPOSITORY" ]; then
+            write=true
+          fi
+        fi
+        echo "write=${write}" >> "$GITHUB_OUTPUT"
 
     - name: Download JUnit artifacts by pattern
       if: (inputs.download-artifacts == 'true' && inputs.download-artifact-pattern != '') || inputs.junit-artifact-pattern != ''
@@ -133,6 +170,7 @@ runs:
     - name: Generate flakewatch report
       shell: bash
       env:
+        ANALYSIS_BRANCH: ${{ inputs.analysis-branch }}
         HISTORY_PATTERN: ${{ steps.flakewatch-history.outputs.pattern }}
       run: |
         workspace="${GITHUB_WORKSPACE:-$PWD}"
@@ -166,6 +204,7 @@ runs:
         args=(
           "--junit=$junit_pattern"
           "--output=$output_path"
+          "--analysis-branch=$ANALYSIS_BRANCH"
           "--source-base-url=$source_base_url"
           "--source-root=$source_root"
         )
@@ -175,7 +214,7 @@ runs:
         fi
 
         if [ -n "${{ steps.flakewatch-history.outputs.dir }}" ]; then
-          if [ "${{ inputs.history-write }}" = "true" ] || { [ "${{ inputs.history-write }}" = "auto" ] && [ "${{ github.event_name }}" != "pull_request" ]; }; then
+          if [ "${{ steps.flakewatch-history-policy.outputs.write }}" = "true" ]; then
             day="$(date -u +%Y/%m/%d)"
             run_file="${{ steps.flakewatch-history.outputs.dir }}/history/${day}/run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}.jsonl"
             mkdir -p "$(dirname "$run_file")"
@@ -229,7 +268,7 @@ runs:
         fi
 
     - name: Commit flakewatch history
-      if: inputs.history-branch != '' && (inputs.history-write == 'true' || (inputs.history-write == 'auto' && github.event_name != 'pull_request'))
+      if: inputs.history-branch != '' && steps.flakewatch-history-policy.outputs.write == 'true'
       shell: bash
       env:
         HISTORY_DIR: ${{ steps.flakewatch-history.outputs.dir }}
@@ -251,10 +290,10 @@ runs:
         git push origin "HEAD:${HISTORY_BRANCH}"
 
     - name: Explain skipped flakewatch history
-      if: inputs.history-branch != '' && inputs.history-write == 'auto' && github.event_name == 'pull_request'
+      if: inputs.history-branch != '' && inputs.history-write == 'auto' && github.event_name == 'pull_request' && steps.flakewatch-history-policy.outputs.write != 'true'
       shell: bash
       run: |
-        echo "::notice::Flakewatch read history from '${{ inputs.history-branch }}' but skipped writing history for this pull_request run because history-write defaults to auto. Trusted push runs will update history."
+        echo "::notice::Flakewatch read history from '${{ inputs.history-branch }}' but skipped writing history because this pull request comes from a fork. Fork workflows cannot update the persistent history branch."
 
     - name: Upload flakewatch report
       id: upload-flakewatch-report

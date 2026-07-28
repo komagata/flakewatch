@@ -49,6 +49,13 @@ class Application extends cli.Application
       }
     ),
     cli.Spec.option(
+      "analysis-branch",
+      "History branch to analyze, or * for all branches",
+      {
+        default: "*"
+      }
+    ),
+    cli.Spec.option(
       "source-base-url",
       "Source base URL",
       {
@@ -100,6 +107,7 @@ class Application extends cli.Application
     github_job = os.Os.env("GITHUB_JOB")
     github_sha = os.Os.env("GITHUB_SHA")
     github_ref_name = os.Os.env("GITHUB_REF_NAME")
+    github_head_ref = os.Os.env("GITHUB_HEAD_REF")
     github_event_name = os.Os.env("GITHUB_EVENT_NAME")
     runner_os = os.Os.env("RUNNER_OS")
     out =
@@ -108,6 +116,7 @@ class Application extends cli.Application
       history: params["history"]
       output: params["output"]
       history_output: params["history-output"]
+      analysis_branch: params["analysis-branch"]
       source_base_url: params["source-base-url"]
       source_root: params["source-root"]
       repo: params["repo"] ?? github_repository ?? "local"
@@ -116,7 +125,7 @@ class Application extends cli.Application
       run_attempt: params["run-attempt"] ?? github_run_attempt ?? "1"
       job: params["job"] ?? github_job ?? "local"
       sha: params["sha"] ?? github_sha ?? ""
-      branch: params["branch"] ?? github_ref_name ?? ""
+      branch: params["branch"] ?? github_head_ref ?? github_ref_name ?? ""
       event: params["event"] ?? github_event_name ?? ""
       os: params["os"] ?? runner_os ?? ""
       runtime: params["runtime"] ?? ""
@@ -140,6 +149,7 @@ class Application extends cli.Application
       --output # HTML report output file path
       --history # History file glob or file path
       --history-output # Write current run history to this path
+      --analysis-branch # History branch to analyze, or * for all branches
       --source-base-url # Source base URL
       --source-root # Source root
       --help, -h # Print this help
