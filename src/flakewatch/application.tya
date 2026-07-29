@@ -1,3 +1,4 @@
+import file
 import os
 import cli/* as cli
 
@@ -91,8 +92,9 @@ class Application extends cli.Application
     if validation != nil
       return validation
     options = opts(invocation)
-    render_report(options)
-    write_history(options)
+    html = Report().render_and_export(options)
+    file.File.write(options["output"], html)
+    println("wrote " + options["output"])
     cli.Result.success("")
 
   # Application.opts converts invocation params into report options.

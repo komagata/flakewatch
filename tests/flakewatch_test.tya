@@ -270,6 +270,17 @@ class FlakewatchTest extends TestCase
     )
     assert(html.contains("<h1>Flakewatch Report</h1>"), "report renders")
 
+  test_report_renders_and_exports_from_one_junit_pass: ->
+    history_path = "tmp/flakewatch-streamed-history.jsonl"
+    if file.File.exists?(history_path)
+      file.File.remove(history_path)
+    result = flakewatch
+      .Report()
+      .render_and_export({ junit: ["tests/fixtures/junit/run1.xml"], history: [], history_output: history_path, analysis_branch: "*", source_base_url: "", source_root: ".", repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "a", branch: "main", event: "push" })
+    assert(result.contains("pkg.FlakyTest.alternates"), "report")
+    items = flakewatch.History().items_from_jsonl([history_path])
+    assert_equal(4, items.len(), "history item count")
+
   test_root_help_uses_tya_cli_application: ->
     outcome = flakewatch.Application().run([])
     assert_equal(0, outcome.status, "status")

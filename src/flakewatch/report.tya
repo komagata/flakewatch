@@ -1,4 +1,5 @@
 import file
+import json
 import template
 import flakewatch/view_model/* as *
 
@@ -12,7 +13,9 @@ class Report
     self.junit = JUnit()
 
   apply_items: by_test, items ->
-    for item in items
+    i = 0
+    while i < items.len()
+      item = items[i]
       class_name = text(item["classname"])
       if class_name == ""
         class_name = text(item["suite"])
@@ -41,10 +44,7 @@ class Report
           last_status: ""
           previous_passish: ""
           recent_passish: []
-          sha_failure_counts: {}
-          sha_pass_counts: {}
-          sha_previous_passish: {}
-          sha_transition_counts: {}
+          sha_stats: {}
         by_test[key] = row
       row = by_test[key]
       item_file = text(item["file"])
@@ -55,27 +55,27 @@ class Report
       status = text(item["status"])
       sha = text(item["sha"])
       if sha != ""
-        if row["sha_pass_counts"][sha] == nil
-          row["sha_pass_counts"][sha] = 0
-          row["sha_failure_counts"][sha] = 0
-          row["sha_transition_counts"][sha] = 0
-          row["sha_previous_passish"][sha] = ""
+        if row["sha_stats"][sha] == nil
+          row["sha_stats"][sha] =
+            pass_count: 0
+            failure_count: 0
+            transition_count: 0
+            previous_passish: ""
+        sha_stat = row["sha_stats"][sha]
         if status == "passed"
           if (
-            row["sha_previous_passish"][sha] != "" and row["sha_previous_passish"][sha] != "true"
+            sha_stat["previous_passish"] != "" and sha_stat["previous_passish"] != "true"
           )
-            row["sha_transition_counts"][sha] = row["sha_transition_counts"][sha]
-              + 1
-          row["sha_previous_passish"][sha] = "true"
-          row["sha_pass_counts"][sha] = row["sha_pass_counts"][sha] + 1
+            sha_stat["transition_count"] = sha_stat["transition_count"] + 1
+          sha_stat["previous_passish"] = "true"
+          sha_stat["pass_count"] = sha_stat["pass_count"] + 1
         elseif status == "failed" or status == "error"
           if (
-            row["sha_previous_passish"][sha] != "" and row["sha_previous_passish"][sha] != "false"
+            sha_stat["previous_passish"] != "" and sha_stat["previous_passish"] != "false"
           )
-            row["sha_transition_counts"][sha] = row["sha_transition_counts"][sha]
-              + 1
-          row["sha_previous_passish"][sha] = "false"
-          row["sha_failure_counts"][sha] = row["sha_failure_counts"][sha] + 1
+            sha_stat["transition_count"] = sha_stat["transition_count"] + 1
+          sha_stat["previous_passish"] = "false"
+          sha_stat["failure_count"] = sha_stat["failure_count"] + 1
       passish = "false"
       if status == "passed" or status == "skipped"
         passish = "true"
@@ -118,6 +118,7 @@ class Report
         )
           row["last_observed_at"] = observed_at
       row["last_status"] = status
+      i = i + 1
 
   build_rows: rows, filter_field, row_class, link_context ->
     data_rows = []
@@ -162,6 +163,14 @@ class Report
           + "-"
           + source_id
     items
+
+  failure_items: items ->
+    out = []
+    for item in items
+      status = text(item["status"])
+      if status == "failed" or status == "error"
+        out.push(item)
+    out
 
   history_items: patterns ->
     if patterns.len() == 0
@@ -249,8 +258,8 @@ class Report
     for item in items_for_branch(current_items, analysis_branch)
       analysis_items.push(item)
     rows = rows_from_items(analysis_items)
-    current_rows = rows_from_items(current_items)
-    history_rows = rows_from_items(past_items)
+    current_rows = rows_from_items(failure_items(current_items))
+    history_rows = rows_from_items(failure_items(past_items))
     notices = []
     if junit_patterns.len() > 0 and junit_files.len() == 0
       if past_items.len() > 0
@@ -265,6 +274,80 @@ class Report
       rows,
       current_rows,
       history_rows,
+      source_base_url,
+      source_root,
+      notices
+    )
+
+  render_and_export: opts ->
+    history_patterns = opts["history"] ?? []
+    junit_patterns = opts["junit"] ?? []
+    source_base_url = opts["source_base_url"] ?? ""
+    source_root = opts["source_root"] ?? "."
+    analysis_branch = opts["analysis_branch"] ?? "*"
+    if analysis_branch == ""
+      analysis_branch = "*"
+    analysis_by_test = {}
+    current_failure_by_test = {}
+    history_failure_by_test = {}
+    history_count = 0
+    history_files = history.files(history_patterns)
+    history_file_index = 0
+    while history_file_index < history_files.len()
+      history_text = file.File.read(history_files[history_file_index])
+      history_lines = history_text.split("\n")
+      line_index = 0
+      while line_index < history_lines.len()
+        line = history_lines[line_index]
+        if line != "" and not history.unsafe_json_chars?(line)
+          item = history.record_from_jsonl(line)
+          if analysis_branch == "*" or text(item["branch"]) == analysis_branch
+            apply_items(analysis_by_test, [item])
+            status = text(item["status"])
+            if status == "failed" or status == "error"
+              apply_items(history_failure_by_test, [item])
+            history_count = history_count + 1
+        line_index = line_index + 1
+      history_file_index = history_file_index + 1
+    junit_files = junit.files(junit_patterns)
+    history_output = opts["history_output"] ?? ""
+    if history_output != ""
+      file.File.write(history_output, "")
+    junit_file_index = 0
+    while junit_file_index < junit_files.len()
+      path_name = junit_files[junit_file_index]
+      junit_items = junit.parse_file(path_name)
+      export_lines = []
+      item_index = 0
+      while item_index < junit_items.len()
+        item = history.record(opts, path_name, junit_items[item_index])
+        if analysis_branch == "*" or text(item["branch"]) == analysis_branch
+          apply_items(analysis_by_test, [item])
+        status = text(item["status"])
+        if status == "failed" or status == "error"
+          apply_items(current_failure_by_test, [item])
+        if history_output != ""
+          export_lines.push(json.Json.dump(history.export_record(item)))
+        item_index = item_index + 1
+      if export_lines.len() > 0
+        file.File.append(history_output, export_lines.join("\n") + "\n")
+      junit_file_index = junit_file_index + 1
+    notices = []
+    if junit_patterns.len() > 0 and junit_files.len() == 0
+      if history_count > 0
+        notices.push(
+          "No current JUnit XML files were found. Showing report data from history only."
+        )
+      else
+        notices.push(
+          "No JUnit XML files or history records were found. Check the JUnit artifact pattern and test report output path."
+        )
+    if history_output != ""
+      println("wrote " + history_output)
+    render_scoped_rows(
+      rows_from_by_test(analysis_by_test),
+      rows_from_by_test(current_failure_by_test),
+      rows_from_by_test(history_failure_by_test),
       source_base_url,
       source_root,
       notices
@@ -307,9 +390,51 @@ class Report
     )
     render_page(data)
 
+  render_with_current: opts, current_items ->
+    history_patterns = opts["history"] ?? []
+    junit_patterns = opts["junit"] ?? []
+    source_base_url = opts["source_base_url"] ?? ""
+    source_root = opts["source_root"] ?? "."
+    analysis_branch = opts["analysis_branch"] ?? "*"
+    if analysis_branch == ""
+      analysis_branch = "*"
+    past_items = items_for_branch(
+      history_items(history_patterns),
+      analysis_branch
+    )
+    analysis_items = []
+    for item in past_items
+      analysis_items.push(item)
+    for item in items_for_branch(current_items, analysis_branch)
+      analysis_items.push(item)
+    rows = rows_from_items(analysis_items)
+    current_rows = rows_from_items(failure_items(current_items))
+    history_rows = rows_from_items(failure_items(past_items))
+    notices = []
+    if junit_patterns.len() > 0 and junit.files(junit_patterns).len() == 0
+      if past_items.len() > 0
+        notices.push(
+          "No current JUnit XML files were found. Showing report data from history only."
+        )
+      else
+        notices.push(
+          "No JUnit XML files or history records were found. Check the JUnit artifact pattern and test report output path."
+        )
+    render_scoped_rows(
+      rows,
+      current_rows,
+      history_rows,
+      source_base_url,
+      source_root,
+      notices
+    )
+
   rows_from_by_test: by_test ->
     rows = []
-    for key in by_test.keys()
+    keys = by_test.keys()
+    i = 0
+    while i < keys.len()
+      key = keys[i]
       row = by_test[key]
       row["avg_duration"] = row["total_duration"] / row["observations"]
       row["flake_score"] = same_sha_flake_score(row)
@@ -318,11 +443,9 @@ class Report
         row["healed_score"] = row["flake_score"]
         row["flake_score"] = 0
       row["recent_passish"] = []
-      row["sha_failure_counts"] = {}
-      row["sha_pass_counts"] = {}
-      row["sha_previous_passish"] = {}
-      row["sha_transition_counts"] = {}
+      row["sha_stats"] = {}
       rows.push(row)
+      i = i + 1
     rows
 
   rows_from_items: items ->
@@ -332,11 +455,12 @@ class Report
 
   same_sha_flake_score: row ->
     score = 0
-    for sha in row["sha_pass_counts"].keys()
-      if row["sha_pass_counts"][sha] > 0 and row["sha_failure_counts"][sha] > 0
+    for sha in row["sha_stats"].keys()
+      sha_stat = row["sha_stats"][sha]
+      if sha_stat["pass_count"] > 0 and sha_stat["failure_count"] > 0
         candidate = 50
-          + row["sha_transition_counts"][sha] * 10
-          + row["sha_failure_counts"][sha] * 5
+          + sha_stat["transition_count"] * 10
+          + sha_stat["failure_count"] * 5
         if candidate > score
           score = candidate
     score

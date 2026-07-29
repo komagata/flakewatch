@@ -21,12 +21,46 @@ class History
       elseif not name.contains(".")
         collect_jsonl(full, out)
 
-  export_file: opts ->
+  export_file: opts -> export_items(opts["output"], items_from_junit(opts))
+
+  export_items: output, items ->
+    file.File.write(output, "")
     lines = []
-    for item in items_from_junit(opts)
-      lines.push(json.Json.dump(item))
-    file.File.write(opts["output"], lines.join("\n") + "\n")
-    println("wrote " + opts["output"])
+    i = 0
+    while i < items.len()
+      item = items[i]
+      lines.push(json.Json.dump(export_record(item)))
+      if lines.len() >= 100
+        file.File.append(output, lines.join("\n") + "\n")
+        lines = []
+      i = i + 1
+    if lines.len() > 0
+      file.File.append(output, lines.join("\n") + "\n")
+    println("wrote " + output)
+
+  export_record: item ->
+    out =
+      repo: item["repo"]
+      workflow: item["workflow"]
+      run_id: item["run_id"]
+      run_attempt: item["run_attempt"]
+      job: item["job"]
+      sha: item["sha"]
+      branch: item["branch"]
+      event: item["event"]
+      junit_path: item["junit_path"]
+      suite: item["suite"]
+      timestamp: item["timestamp"]
+      observed_at: item["observed_at"]
+      source_id: item["source_id"]
+      classname: item["classname"]
+      name: item["name"]
+      file: item["file"]
+      line: item["line"]
+      duration: item["duration"]
+      status: item["status"]
+      message: item["message"]
+    out
 
   files: patterns ->
     out = []
@@ -83,28 +117,22 @@ class History
       and line[i + 4] == ";"
 
   record: opts, junit_path, item ->
-    out =
-      repo: opts["repo"]
-      workflow: opts["workflow"]
-      run_id: opts["run_id"]
-      run_attempt: opts["run_attempt"]
-      job: opts["job"]
-      sha: opts["sha"]
-      branch: opts["branch"]
-      event: opts["event"]
-      junit_path: junit_path
-      suite: item["suite"]
-      timestamp: item["timestamp"]
-      observed_at: item["timestamp"]
-      source_id: opts["run_id"] + "-" + opts["run_attempt"] + "-" + junit_path
-      classname: item["classname"]
-      name: item["name"]
-      file: item["file"]
-      line: item["line"]
-      duration: item["duration"]
-      status: item["status"]
-      message: item["message"]
-    out
+    item["repo"] = opts["repo"]
+    item["workflow"] = opts["workflow"]
+    item["run_id"] = opts["run_id"]
+    item["run_attempt"] = opts["run_attempt"]
+    item["job"] = opts["job"]
+    item["sha"] = opts["sha"]
+    item["branch"] = opts["branch"]
+    item["event"] = opts["event"]
+    item["junit_path"] = junit_path
+    item["observed_at"] = item["timestamp"]
+    item["source_id"] = opts["run_id"]
+      + "-"
+      + opts["run_attempt"]
+      + "-"
+      + junit_path
+    item
 
   record_from_jsonl: line ->
     out =
