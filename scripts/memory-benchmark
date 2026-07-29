@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+fixture="${1:-tmp/memory-fixture}"
+mode="${2:-full}"
+binary="${FLAKEWATCH_BENCHMARK_BINARY:-tmp/memory-benchmark/flakewatch}"
+limit_bytes="${FLAKEWATCH_MEMORY_LIMIT_BYTES:-209715200}"
+unit="flakewatch-memory-$RANDOM-$$.service"
+
+mkdir -p tmp/memory-benchmark
+if [ ! -d "$fixture/junit" ] || [ ! -f "$fixture/history/history.jsonl" ]; then
+  ./scripts/generate-memory-fixture "$fixture"
+fi
+
+if [ -z "${FLAKEWATCH_BENCHMARK_BINARY:-}" ]; then
+  TYA_SAFE_TIMEOUT=180 ./scripts/tya-tmux build src/main.tya -o "$binary"
+fi
+
+args=(
+  "--junit=$repo_root/$fixture/junit/**/*.xml"
+  "--analysis-branch=main"
+  "--branch=main"
+  "--sha=benchmark"
+  "--output=$repo_root/tmp/memory-benchmark/report.html"
+)
+case "$mode" in
+  junit)
+    ;;
+  export)
+    args+=("--history-output=$repo_root/tmp/memory-benchmark/current.jsonl")
+    ;;
+  history)
+    args+=("--history=$repo_root/$fixture/history/**/*.jsonl")
+    ;;
+  full)
+    args+=(
+      "--history=$repo_root/$fixture/history/**/*.jsonl"
+      "--history-output=$repo_root/tmp/memory-benchmark/current.jsonl"
+    )
+    ;;
+  *)
+    printf 'unknown benchmark mode: %s\n' "$mode" >&2
+    exit 2
+    ;;
+esac
+
+systemd-run --user --unit="$unit" \
+  -p MemoryAccounting=yes \
+  -p MemoryMax=2G \
+  -p MemorySwapMax=0 \
+  --working-directory="$repo_root" \
+  "$repo_root/$binary" "${args[@]}" >/dev/null
+
+peak_kb=0
+while systemctl --user is-active --quiet "$unit"; do
+  pid="$(systemctl --user show "$unit" --property=MainPID --value)"
+  if [ "$pid" -gt 0 ] && [ -r "/proc/$pid/status" ]; then
+    current_kb="$(awk '$1 == "VmHWM:" { print $2 }' "/proc/$pid/status" 2>/dev/null || true)"
+    if [ "${current_kb:-0}" -gt "$peak_kb" ]; then
+      peak_kb="$current_kb"
+    fi
+  fi
+  sleep 0.05
+done
+
+peak="$((peak_kb * 1024))"
+result="$(systemctl --user show "$unit" --property=Result --value)"
+printf 'mode=%s\nmemory_peak_bytes=%s\nmemory_limit_bytes=%s\nresult=%s\n' \
+  "$mode" "$peak" "$limit_bytes" "$result"
+systemctl --user reset-failed "$unit" >/dev/null 2>&1 || true
+
+test "$result" = "success"
+test "$peak" -le "$limit_bytes"

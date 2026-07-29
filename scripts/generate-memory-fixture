@@ -1,0 +1,70 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "json"
+
+root = ARGV.fetch(0, "tmp/memory-fixture")
+junit_dir = File.join(root, "junit")
+history_dir = File.join(root, "history")
+FileUtils.rm_rf(root)
+FileUtils.mkdir_p(junit_dir)
+FileUtils.mkdir_p(history_dir)
+
+test_count = 2_955
+file_count = 550
+history_count = 2_936
+
+file_count.times do |file_index|
+  first = file_index * test_count / file_count
+  last = (file_index + 1) * test_count / file_count
+  cases = (first...last).map do |test_index|
+    status = test_index % 97 == 0 ? '<failure message="failure">stack trace</failure>' : ""
+    format(
+      '  <testcase classname="GeneratedTest%<index>d" name="test_%<index>d" time="0.01" file="test/generated_test.rb" line="%<line>d">%<status>s</testcase>',
+      index: test_index,
+      line: test_index % 200 + 1,
+      status: status
+    )
+  end
+  xml = [
+    %(<?xml version="1.0" encoding="UTF-8"?>),
+    %(<testsuite name="generated" timestamp="2026-01-01T00:00:00Z">),
+    *cases,
+    %(</testsuite>)
+  ].join("\n")
+  File.write(File.join(junit_dir, format("TEST-%03d.xml", file_index)), xml)
+end
+
+history_path = File.join(history_dir, "history.jsonl")
+File.open(history_path, "w") do |file|
+  history_count.times do |test_index|
+    status = test_index % 101 == 0 ? "failed" : "passed"
+    file.puts(
+      JSON.generate(
+        repo: "fjordllc/bootcamp",
+        workflow: "test",
+        run_id: "history",
+        run_attempt: "1",
+        job: "test",
+        sha: "history-sha",
+        branch: "main",
+        event: "push",
+        junit_path: "generated",
+        suite: "generated",
+        timestamp: "2026-01-01T00:00:00Z",
+        observed_at: "2026-01-01T00:00:00Z",
+        source_id: "history-1",
+        classname: "GeneratedTest#{test_index}",
+        name: "test_#{test_index}",
+        file: "test/generated_test.rb",
+        line: (test_index % 200 + 1).to_s,
+        duration: 0.01,
+        status: status,
+        message: status == "failed" ? "failure" : ""
+      )
+    )
+  end
+end
+
+puts "fixture=#{root} xml_files=#{file_count} testcases=#{test_count} history_records=#{history_count}"

@@ -281,6 +281,16 @@ class FlakewatchTest extends TestCase
     items = flakewatch.History().items_from_jsonl([history_path])
     assert_equal(4, items.len(), "history item count")
 
+  test_report_uses_compact_rows_for_streaming_aggregation: ->
+    items = flakewatch
+      .History()
+      .items_from_junit({ junit: ["tests/fixtures/junit/run1.xml"], repo: "repo", workflow: "ci", run_id: "1", run_attempt: "1", job: "test", sha: "a", branch: "main", event: "push" })
+    by_test = {}
+    flakewatch.Report().apply_compact_items(by_test, items)
+    row = by_test["pkg.FlakyTest.alternates"]
+    assert_equal(24, row.len(), "compact row width")
+    assert_equal("pkg.FlakyTest.alternates", row[0], "name")
+
   test_root_help_uses_tya_cli_application: ->
     outcome = flakewatch.Application().run([])
     assert_equal(0, outcome.status, "status")

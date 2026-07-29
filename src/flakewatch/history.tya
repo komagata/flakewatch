@@ -29,7 +29,7 @@ class History
     i = 0
     while i < items.len()
       item = items[i]
-      lines.push(json.Json.dump(export_record(item)))
+      lines.push(export_line(item))
       if lines.len() >= 100
         file.File.append(output, lines.join("\n") + "\n")
         lines = []
@@ -37,6 +37,12 @@ class History
     if lines.len() > 0
       file.File.append(output, lines.join("\n") + "\n")
     println("wrote " + output)
+
+  export_line: item ->
+    json_value = json.Json(nil)
+    ["{{\"repo\":", json_value.escape_string(text(item["repo"])), ",\"workflow\":", json_value.escape_string(text(item["workflow"])), ",\"run_id\":", json_value.escape_string(text(item["run_id"])), ",\"run_attempt\":", json_value.escape_string(text(item["run_attempt"])), ",\"job\":", json_value.escape_string(text(item["job"])), ",\"sha\":", json_value.escape_string(text(item["sha"])), ",\"branch\":", json_value.escape_string(text(item["branch"])), ",\"event\":", json_value.escape_string(text(item["event"])), ",\"junit_path\":", json_value.escape_string(text(item["junit_path"])), ",\"suite\":", json_value.escape_string(text(item["suite"])), ",\"timestamp\":", json_value.escape_string(text(item["timestamp"])), ",\"observed_at\":", json_value.escape_string(text(item["observed_at"])), ",\"source_id\":", json_value.escape_string(text(item["source_id"])), ",\"classname\":", json_value.escape_string(text(item["classname"])), ",\"name\":", json_value.escape_string(text(item["name"])), ",\"file\":", json_value.escape_string(text(item["file"])), ",\"line\":", json_value.escape_string(text(item["line"])), ",\"duration\":", text(item["duration"]), ",\"status\":", json_value.escape_string(text(item["status"])), ",\"message\":", json_value.escape_string(text(item["message"])), "}}"].join(
+      ""
+    )
 
   export_record: item ->
     out =
@@ -167,6 +173,8 @@ class History
       and hex_digit?(line[i + 3])
       and hex_digit?(line[i + 4])
       and hex_digit?(line[i + 5])
+
+  text: value -> "{value}"
 
   unescape_json_string: text ->
     text

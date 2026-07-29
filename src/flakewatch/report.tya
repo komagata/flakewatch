@@ -1,5 +1,4 @@
 import file
-import json
 import template
 import flakewatch/view_model/* as *
 
@@ -11,6 +10,103 @@ class Report
   initialize: ->
     self.history = History()
     self.junit = JUnit()
+
+  apply_compact_items: by_test, items ->
+    i = 0
+    while i < items.len()
+      item = items[i]
+      class_name = text(item["classname"])
+      if class_name == ""
+        class_name = text(item["suite"])
+      test_name = text(item["name"])
+      key = class_name + "." + test_name
+      if by_test[key] == nil
+        by_test[key] =
+          key
+          test_name
+          text(item["suite"])
+          text(item["file"])
+          text(item["line"])
+          0
+          0
+          0
+          0
+          0
+          0
+          0
+          0.0
+          0.0
+          0
+          {}
+          ""
+          ""
+          ""
+          ""
+          []
+          {}
+          0
+          0
+      row = by_test[key]
+      item_file = text(item["file"])
+      if row[3] == "" and item_file != ""
+        row[3] = item_file
+      if row[4] == "" and item_file != ""
+        row[4] = text(item["line"])
+      status = text(item["status"])
+      sha = text(item["sha"])
+      if sha != ""
+        if row[21][sha] == nil
+          row[21][sha] = [0, 0, 0, ""]
+        sha_stat = row[21][sha]
+        if status == "passed"
+          if sha_stat[3] != "" and sha_stat[3] != "true"
+            sha_stat[2] = sha_stat[2] + 1
+          sha_stat[3] = "true"
+          sha_stat[0] = sha_stat[0] + 1
+        elseif status == "failed" or status == "error"
+          if sha_stat[3] != "" and sha_stat[3] != "false"
+            sha_stat[2] = sha_stat[2] + 1
+          sha_stat[3] = "false"
+          sha_stat[1] = sha_stat[1] + 1
+      passish = "false"
+      if status == "passed" or status == "skipped"
+        passish = "true"
+      if row[19] != "" and row[19] != passish
+        row[11] = row[11] + 1
+      row[19] = passish
+      row[20].push(passish)
+      row[5] = row[5] + 1
+      if status == "passed"
+        row[6] = row[6] + 1
+      elseif status == "failed"
+        row[7] = row[7] + 1
+        row[10] = row[10] + 1
+      elseif status == "error"
+        row[8] = row[8] + 1
+        row[10] = row[10] + 1
+      elseif status == "skipped"
+        row[9] = row[9] + 1
+      row[12] = row[12] + item["duration"]
+      if item["duration"] > row[13]
+        row[13] = item["duration"]
+      source_id = text(item["source_id"])
+      if source_id == ""
+        source_id = text(item["run_id"])
+      if source_id == ""
+        source_id = text(item["timestamp"])
+      if source_id != "" and row[15][source_id] == nil
+        row[15][source_id] = "true"
+        row[14] = row[14] + 1
+      observed_at = text(item["observed_at"])
+      if observed_at == ""
+        observed_at = text(item["timestamp"])
+      if observed_at != ""
+        if row[16] == "" or observed_at < row[16]
+          row[16] = observed_at
+        if row[17] == "" or observed_at > row[17]
+          row[17] = observed_at
+      row[18] = status
+      i = i + 1
 
   apply_items: by_test, items ->
     i = 0
@@ -145,6 +241,105 @@ class Report
       out.push(item)
     out
 
+  compact_flake_score: row ->
+    score = 0
+    for sha in row[21].keys()
+      sha_stat = row[21][sha]
+      if sha_stat[0] > 0 and sha_stat[1] > 0
+        candidate = 50 + sha_stat[2] * 10 + sha_stat[1] * 5
+        if candidate > score
+          score = candidate
+    score
+
+  compact_row_dict: row ->
+    out =
+      name: row[0]
+      test_name: row[1]
+      suite: row[2]
+      file: row[3]
+      line: row[4]
+      observations: row[5]
+      pass_count: row[6]
+      fail_count: row[7]
+      error_count: row[8]
+      skipped_count: row[9]
+      failure_count: row[10]
+      transition_count: row[11]
+      total_duration: row[12]
+      avg_duration: row[12] / row[5]
+      max_duration: row[13]
+      run_count: row[14]
+      source_ids: row[15]
+      first_observed_at: row[16]
+      last_observed_at: row[17]
+      last_status: row[18]
+      flake_score: row[22]
+      healed_score: row[23]
+    out
+
+  compact_top_rows: rows, index, limit ->
+    out = []
+    used = {}
+    while out.len() < limit and out.len() < rows.len()
+      best = nil
+      best_index = -1
+      i = 0
+      while i < rows.len()
+        key = text(i)
+        if used[key] == nil
+          if best == nil or rows[i][index] > best[index]
+            best = rows[i]
+            best_index = i
+        i = i + 1
+      if best == nil
+        return out
+      used[text(best_index)] = "true"
+      out.push(compact_row_dict(best))
+    out
+
+  direct_table_header: kind ->
+    if kind == "flaky"
+      return "<th class=\"num\" data-sort=\"number\">Score</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"num\" data-sort=\"number\">Runs</th><th class=\"num\" data-sort=\"number\">Pass</th><th class=\"num\" data-sort=\"number\">Fail</th><th class=\"num\" data-sort=\"number\">Error</th><th class=\"num\" data-sort=\"number\">Transitions</th><th class=\"status\" data-sort=\"text\">Last</th>"
+    if kind == "healed"
+      return "<th class=\"num\" data-sort=\"number\">Score</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"num\" data-sort=\"number\">Runs</th><th class=\"num\" data-sort=\"number\">Pass</th><th class=\"num\" data-sort=\"number\">Fail</th><th class=\"num\" data-sort=\"number\">Error</th><th class=\"status\" data-sort=\"text\">Recent</th>"
+    if kind == "failing" or kind == "most_failing"
+      return "<th class=\"num\" data-sort=\"number\">Failures</th><th class=\"num\" data-sort=\"number\">Fail</th><th class=\"num\" data-sort=\"number\">Error</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"num\" data-sort=\"number\">Runs</th><th class=\"status\" data-sort=\"text\">Last</th>"
+    "<th class=\"num\" data-sort=\"number\">Max seconds</th><th class=\"num\" data-sort=\"number\">Avg seconds</th><th class=\"num\" data-sort=\"number\">Obs</th><th class=\"num\" data-sort=\"number\">Runs</th><th class=\"status\" data-sort=\"text\">Last</th>"
+
+  direct_table_values: kind, row ->
+    last_status = escape_html(row.last_status)
+    if kind == "flaky"
+      return "<td class=\"num\">{row.flake_score}</td><td class=\"num\">{row.observations}</td><td class=\"num\">{row.run_count}</td><td class=\"num\">{row.pass_count}</td><td class=\"num\">{row.fail_count}</td><td class=\"num\">{row.error_count}</td><td class=\"num\">{row.transition_count}</td><td class=\"status\">{last_status}</td>"
+    if kind == "healed"
+      recent_status = escape_html(row.recent_status)
+      return "<td class=\"num\">{row.healed_score}</td><td class=\"num\">{row.observations}</td><td class=\"num\">{row.run_count}</td><td class=\"num\">{row.pass_count}</td><td class=\"num\">{row.fail_count}</td><td class=\"num\">{row.error_count}</td><td class=\"status\">{recent_status}</td>"
+    if kind == "failing" or kind == "most_failing"
+      return "<td class=\"num\">{row.failure_count}</td><td class=\"num\">{row.fail_count}</td><td class=\"num\">{row.error_count}</td><td class=\"num\">{row.observations}</td><td class=\"num\">{row.run_count}</td><td class=\"status\">{last_status}</td>"
+    "<td class=\"num\">{row.max_duration}</td><td class=\"num\">{row.avg_duration}</td><td class=\"num\">{row.observations}</td><td class=\"num\">{row.run_count}</td><td class=\"status\">{last_status}</td>"
+
+  direct_test_cell: row ->
+    label = escape_html(row.test_label)
+    link_value = TestLink(
+      row.row,
+      row.source_base_url,
+      row.source_root,
+      row.source_cache,
+      row.source_line_cache
+    )
+    if link_value.link
+      label = "<a href=\""
+        + escape_html(link_value.href)
+        + "\">"
+        + label
+        + "</a>"
+    "<td class=\"test-col\"><div class=\"test-name\">"
+      + label
+      + "</div><div class=\"test-meta\">First: "
+      + escape_html(row.first_observed_at)
+      + " · Last: "
+      + escape_html(row.last_observed_at)
+      + "</div></td>"
+
   enrich_items: items, opts ->
     for item in items
       item["repo"] = text(opts["repo"])
@@ -164,6 +359,14 @@ class Report
           + source_id
     items
 
+  escape_html: value ->
+    text(value)
+      .replace("&", "&amp;")
+      .replace("<", "&lt;")
+      .replace(">", "&gt;")
+      .replace("\"", "&quot;")
+      .replace("'", "&#39;")
+
   failure_items: items ->
     out = []
     for item in items
@@ -171,6 +374,22 @@ class Report
       if status == "failed" or status == "error"
         out.push(item)
     out
+
+  finish_compact_rows: by_test ->
+    rows = []
+    keys = by_test.keys()
+    i = 0
+    while i < keys.len()
+      row = by_test[keys[i]]
+      row[22] = compact_flake_score(row)
+      if row[22] > 0 and recent_all_passed(row[20], 10)
+        row[23] = row[22]
+        row[22] = 0
+      row[20] = []
+      row[21] = {}
+      rows.push(row)
+      i = i + 1
+    rows
 
   history_items: patterns ->
     if patterns.len() == 0
@@ -302,12 +521,13 @@ class Report
         if line != "" and not history.unsafe_json_chars?(line)
           item = history.record_from_jsonl(line)
           if analysis_branch == "*" or text(item["branch"]) == analysis_branch
-            apply_items(analysis_by_test, [item])
+            apply_compact_items(analysis_by_test, [item])
             status = text(item["status"])
             if status == "failed" or status == "error"
-              apply_items(history_failure_by_test, [item])
+              apply_compact_items(history_failure_by_test, [item])
             history_count = history_count + 1
         line_index = line_index + 1
+      runtime_gc_collect()
       history_file_index = history_file_index + 1
     junit_files = junit.files(junit_patterns)
     history_output = opts["history_output"] ?? ""
@@ -322,15 +542,16 @@ class Report
       while item_index < junit_items.len()
         item = history.record(opts, path_name, junit_items[item_index])
         if analysis_branch == "*" or text(item["branch"]) == analysis_branch
-          apply_items(analysis_by_test, [item])
+          apply_compact_items(analysis_by_test, [item])
         status = text(item["status"])
         if status == "failed" or status == "error"
-          apply_items(current_failure_by_test, [item])
+          apply_compact_items(current_failure_by_test, [item])
         if history_output != ""
-          export_lines.push(json.Json.dump(history.export_record(item)))
+          export_lines.push(history.export_line(item))
         item_index = item_index + 1
       if export_lines.len() > 0
         file.File.append(history_output, export_lines.join("\n") + "\n")
+      runtime_gc_collect()
       junit_file_index = junit_file_index + 1
     notices = []
     if junit_patterns.len() > 0 and junit_files.len() == 0
@@ -344,10 +565,10 @@ class Report
         )
     if history_output != ""
       println("wrote " + history_output)
-    render_scoped_rows(
-      rows_from_by_test(analysis_by_test),
-      rows_from_by_test(current_failure_by_test),
-      rows_from_by_test(history_failure_by_test),
+    render_scoped_compact_rows(
+      finish_compact_rows(analysis_by_test),
+      finish_compact_rows(current_failure_by_test),
+      finish_compact_rows(history_failure_by_test),
       source_base_url,
       source_root,
       notices
@@ -363,6 +584,30 @@ class Report
       .Template(template_path("report.html"))
       .render_file(data, { escape: "html" })
 
+  render_page_direct: data ->
+    template_text = file.File.read(template_path("report.html"))
+    head = template_text.split("  {{ for notice in notices }}")[0]
+    tail = "<script>" + template_text.split("<script>")[1]
+    parts = [head]
+    for notice in data["notices"]
+      parts.push("<div class=\"notice\">" + escape_html(notice) + "</div>")
+    parts.push("<div class=\"summary\">")
+    for metric in data["metrics"]
+      parts.push(
+        "<div class=\"metric\"><strong>" + escape_html(metric["value"]) + "</strong>" + escape_html(metric["label"]) + "</div>"
+      )
+    parts.push("</div>")
+    for section in data["sections"]
+      parts.push("<h2>" + escape_html(section["title"]) + "</h2>")
+      if section["has_rows"]
+        parts.push(render_table_direct(section))
+      else
+        parts.push(
+          "<div class=\"empty\">" + escape_html(section["empty_message"]) + "</div>"
+        )
+    parts.push(tail)
+    parts.join("")
+
   render_rows: rows, source_base_url, source_root, notices ->
     source_cache = {}
     source_line_cache = {}
@@ -374,7 +619,104 @@ class Report
       source_line_cache,
       notices
     )
-    render_page(data)
+    render_page_direct(data)
+
+  render_scoped_compact_rows: rows, current_rows, history_rows, source_base_url, source_root, notices ->
+    source_cache = {}
+    source_line_cache = {}
+    total = rows.len()
+    observations = 0
+    failures = 0
+    source_ids = {}
+    slow_tests = 0
+    i = 0
+    while i < rows.len()
+      row = rows[i]
+      observations = observations + row[5]
+      failures = failures + row[7] + row[8]
+      if row[13] > 0.0
+        slow_tests = slow_tests + 1
+      for source_id in row[15].keys()
+        source_ids[source_id] = "true"
+      i = i + 1
+    links = link_context(
+      source_base_url,
+      source_root,
+      source_cache,
+      source_line_cache
+    )
+    flaky_rows = compact_top_rows(rows, 22, 20)
+    healed_rows = compact_top_rows(rows, 23, 20)
+    current_failure_rows = compact_top_rows(current_rows, 10, 20)
+    history_failure_rows = compact_top_rows(history_rows, 10, 20)
+    slow_rows = compact_top_rows(rows, 13, 20)
+    data =
+      metrics: [
+        {
+          value: text(total),
+          label: "tests"
+        },
+        {
+          value: text(observations),
+          label: "observations"
+        },
+        {
+          value: text(source_ids.keys().len()),
+          label: "test runs"
+        },
+        {
+          value: text(failures),
+          label: "failures/errors"
+        },
+        {
+          value: text(slow_tests),
+          label: "slow tests"
+        }
+      ]
+      notices: notices
+      sections: [
+        section(
+          "flaky",
+          "Flaky Tests",
+          build_rows(flaky_rows, "flake_score", Flaky, links),
+          "No flaky tests detected in these JUnit files."
+        ),
+        section(
+          "healed",
+          "Healed Candidates",
+          build_rows(healed_rows, "healed_score", Healed, links),
+          "No healed candidates detected. A test must have past pass/fail variation and 10 most recent passing observations."
+        ),
+        section(
+          "failing",
+          "Failing Tests",
+          build_rows(
+            current_failure_rows,
+            "failure_count",
+            Failing,
+            links
+          ),
+          "No failing tests found in the current JUnit files."
+        ),
+        section(
+          "most_failing",
+          "Most Failed Tests",
+          build_rows(
+            history_failure_rows,
+            "failure_count",
+            Failing,
+            links
+          ),
+          "No historical failures found in the selected history."
+        ),
+        section(
+          "slow",
+          "Slow Tests",
+          build_rows(slow_rows, "", Slow, links),
+          "No tests found in these JUnit files."
+        )
+      ]
+    render_page_direct(data)
 
   render_scoped_rows: rows, current_rows, history_rows, source_base_url, source_root, notices ->
     source_cache = {}
@@ -389,6 +731,19 @@ class Report
       notices
     )
     render_page(data)
+
+  render_table_direct: section ->
+    parts =
+      "<div class=\"table-wrap\"><table><thead><tr><th class=\"test-col\" data-sort=\"text\">Test</th>"
+      direct_table_header(section["kind"])
+      "</tr></thead><tbody>"
+    for row in section["rows"]
+      parts.push("<tr>")
+      parts.push(direct_test_cell(row))
+      parts.push(direct_table_values(section["kind"], row))
+      parts.push("</tr>")
+    parts.push("</tbody></table></div>")
+    parts.join("")
 
   render_with_current: opts, current_items ->
     history_patterns = opts["history"] ?? []
